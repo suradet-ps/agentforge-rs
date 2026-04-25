@@ -1,0 +1,13 @@
+# Ignore Rust build artifacts
+/target/
+
+# macOS
+.DS_Store
+
+# Editor folders
+.vscode/
+.idea/
+
+# Backup and swap files
+*.swp
+*~

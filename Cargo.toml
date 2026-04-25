@@ -1,0 +1,14 @@
+[package]
+name = "cargo-agentforge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95.0"
+authors = ["Suradet Pratomsak"]
+license = "MIT"
+description = "Installs AGENTS-RUST.md into Rust projects"
+
+[dependencies]
+
+[[bin]]
+name = "cargo-agentforge"
+path = "src/main.rs"
