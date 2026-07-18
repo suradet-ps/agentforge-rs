@@ -20,11 +20,12 @@ machine-readable rules manifest, and a reproducible offline-install story.
 - [x] `templates/AGENTS-RUST.md`: 14-section constitution with `[OVERRIDE §X]` system
 - [x] MIT license, `CONTRIBUTING.md`, `rustfmt.toml`
 - [x] README with quick start, override-system docs, maintenance flow
-- [x] GitHub issue/PR templates (under `templates/`)
-- [ ] CI: fmt, clippy `-D warnings`, test, cross-platform release build (x86_64-unknown-linux-gnu / x86_64-pc-windows-msvc / x86_64-apple-darwin)
-- [ ] cargo-audit + cargo-deny as the dependency tree grows (currently zero deps, but the policy is set now)
-- [ ] Release workflow: tag-triggered, checksums, GitHub release
-- [ ] Branch protection on `main`: required status checks (strict), no force-push, no deletion
+- [x] GitHub issue/PR templates (under `.github/`): PR, bug report, rule refinement, security report
+- [x] CI: fmt, clippy `-D warnings`, test, cross-platform release build (x86_64-unknown-linux-gnu / x86_64-pc-windows-msvc / x86_64-apple-darwin)
+- [x] cargo-audit + cargo-deny policy set (`deny.toml`), enforced in CI; currently zero deps, the gate stays as the tree grows
+- [x] Release workflow: tag-triggered, checksums (`SHA256SUMS.txt`), GitHub release via `gh` CLI
+- [x] SECURITY.md (private reporting, no-network install-path guarantee) and CODE_OF_CONDUCT.md (Contributor Covenant 2.1)
+- [ ] Branch protection on `main`: required status checks (strict), no force-push, no deletion — **must be enabled in the GitHub repository settings** (not settable from a file). Suggested command captured in the Phase 0 PR body. CI already enforces the same checks on every PR.
 
 ## Phase 1: Domain / Rule Model (`agentforge-domain`) (open)
 
