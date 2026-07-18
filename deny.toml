@@ -22,13 +22,11 @@ allow = [
 confidence-threshold = 0.8
 
 [bans]
-version = 1
 multiple-versions = "warn"
 wildcards = "warn"
 highlight = "all"
 
 [sources]
-version = 1
 unknown-registry = "warn"
 unknown-git = "warn"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
