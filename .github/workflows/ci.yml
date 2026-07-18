@@ -108,6 +108,10 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@ef301417264190a1eb9f26fcf171642070085c5b # v1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
-          command: check
+          toolchain: stable
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked --version 0.16.4
+      - name: Check dependency policy
+        run: cargo deny check
