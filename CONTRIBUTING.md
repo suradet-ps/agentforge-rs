@@ -17,11 +17,18 @@ How to contribute
 5. Push your branch and open a Pull Request targeting the main branch. Include a short description and testing notes.
 6. Be responsive to review comments and update your PR as requested.
 
+Branch protection
+
+`main` is protected: required status checks (fmt, clippy, test, cross-platform
+build, audit, deny) must pass, force-push and deletion are disabled. PRs
+require a passing CI run before merge.
+
 PR guidelines
 
 - Keep PRs focused and small.
 - Include tests for new behavior when possible.
-- All CI checks should pass before merging.
+- All CI checks (`cargo fmt`, `cargo clippy -D warnings`, `cargo test`,
+  cross-platform build, `cargo audit`, `cargo deny`) must pass before merging.
 
 License
 
