@@ -27,30 +27,32 @@ machine-readable rules manifest, and a reproducible offline-install story.
 - [x] SECURITY.md (private reporting, no-network install-path guarantee) and CODE_OF_CONDUCT.md (Contributor Covenant 2.1)
 - [ ] Branch protection on `main`: required status checks (strict), no force-push, no deletion — **must be enabled in the GitHub repository settings** (not settable from a file). Suggested command captured in the Phase 0 PR body. CI already enforces the same checks on every PR.
 
-## Phase 1: Domain / Rule Model (`agentforge-domain`) (open)
+## Phase 1: Domain / Rule Model (`agentforge-domain`) (done)
 
 Today the rule set is a single opaque markdown blob. To version, validate,
 and diff rules we need a structured, typed model of what a rule actually is.
 This is the phase that makes everything downstream possible.
 
-- [ ] New crate `agentforge-domain` with zero `std::unwrap()` outside tests
-- [ ] `RuleId` newtype (e.g. `RuleId("5.2")`), never a bare `String` key floating through the code
-- [ ] `Rule` entity: id, section, title, body, severity (`Mandatory` / `Recommended` / `Advisory`), machine-readable tag set (`tokio`, `unsafe`, `testing`, …)
-- [ ] `Override` entity: a `[OVERRIDE §X]` parsed into target rule id + replacement / exemption, with validation that the target id actually exists in the baseline
-- [ ] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides, with `apply_overrides()` producing the effective rule set
-- [ ] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"
-- [ ] Domain error types with `thiserror`; typed errors for "override targets nonexistent rule", "duplicate rule id", "malformed rule id"
-- [ ] Unit tests: rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering
+- [x] New crate `agentforge-domain` with zero `std::unwrap()` outside tests
+- [x] `RuleId` newtype (e.g. `RuleId("5.2")`), never a bare `String` key floating through the code; validated against `[0-9.]` pattern, numeric ordering (`5` < `5.2` < `14`)
+- [x] `Rule` entity: id, section, title, body, severity (`Mandatory` / `Recommended` / `Advisory`), machine-readable tag set (`tokio`, `unsafe`, `testing`, …); case-insensitive tag lookup
+- [x] `Override` entity: a `[OVERRIDE §X]` parsed into target rule id + replacement / exemption, with validation that the target id actually exists in the baseline; `parse_line()` handles the bracket/section format
+- [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides, with `add_rule()` / `add_override()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
+- [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule body checksums (FNV-1a placeholder for SHA-256), JSON serializable
+- [x] Domain error types with `thiserror`; typed errors for `InvalidRuleId`, `DuplicateRuleId`, `OverrideTargetNotFound`, `DuplicateOverride`, `EmptyRuleSet`, `MissingField`, `ManifestVersionMismatch`
+- [x] Unit tests: 30 tests covering rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering, override parsing (valid/invalid/edge cases), manifest generation, serialization round-trip
+- [x] Workspace restructured: root `Cargo.toml` now a workspace with `crates/cargo-agentforge` and `crates/agentforge-domain`
+- [x] `serde` + `thiserror` added to workspace dependencies; `serde_json` as dev-dependency for manifest tests
 
-## Phase 2: Rule Manifest Format (`.agentforge.json` / versioned) (open)
+## Phase 2: Rule Manifest Format (`.agentforge.json` / versioned) (partially done)
 
 The markdown is for humans and agents. Tooling (CI, the CLI's own
 version-check, future IDE plugins) needs a stable, parseable artifact.
 
+- [x] Manifest fields: `manifest_version`, `ruleset_version`, `generated_at`, `rule_count`, `rules[]` (id, section, severity, tags, checksum of body), `overrides[]` — defined as `RuleManifest` / `ManifestRule` / `ManifestOverride` in `agentforge-domain`
+- [x] Per-rule body checksum so the CLI can detect "the user edited this rule locally" vs "this is a pristine baseline rule" — the foundation of safe updates (Phase 6); currently FNV-1a, will swap for real SHA-256
+- [x] Schema validation via `serde` deserialization; rejects malformed manifests with typed errors, never panics
 - [ ] Format specification written down (`docs/RULE_MANIFEST.md`): schema, versioning strategy (semver of the rule set, independent of the CLI version), forward/backward compatibility rules
-- [ ] Manifest fields: `manifest_version`, `ruleset_version`, `generated_at`, `rule_count`, `sections[]`, `rules[]` (id, section, severity, tags, checksum of body), `overrides[]`
-- [ ] Per-rule body checksum so the CLI can detect "the user edited this rule locally" vs "this is a pristine baseline rule" — the foundation of safe updates (Phase 6)
-- [ ] Schema validation (hand-rolled or `serde` + `schemars`); reject a malformed manifest with a typed error, never a panic
 - [ ] Round-trip test: parse baseline → emit manifest → re-read manifest → identical effective rule set
 
 ## Phase 3: Installer Rewrite (`agentforge-core`) (open)
