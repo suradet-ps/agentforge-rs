@@ -1,14 +1,16 @@
-[package]
-name = "cargo-agentforge"
-version = "0.1.0"
+[workspace]
+resolver = "3"
+members = [
+    "crates/cargo-agentforge",
+    "crates/agentforge-domain",
+]
+
+[workspace.package]
 edition = "2024"
 rust-version = "1.95.0"
 authors = ["Suradet Pratomsak"]
 license = "MIT"
-description = "Installs AGENTS-RUST.md into Rust projects"
 
-[dependencies]
-
-[[bin]]
-name = "cargo-agentforge"
-path = "src/main.rs"
+[workspace.dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
