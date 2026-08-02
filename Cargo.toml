@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "crates/cargo-agentforge",
-    "crates/agentforge-domain",
+    "crates/agentforge-domain", "crates/agentforge-core",
 ]
 
 [workspace.package]

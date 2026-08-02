@@ -55,19 +55,19 @@ version-check, future IDE plugins) needs a stable, parseable artifact.
 - [x] Format specification written down (`docs/RULE_MANIFEST.md`): schema, versioning strategy (semver of the rule set, independent of the CLI version), forward/backward compatibility rules
 - [x] Round-trip test: parse baseline → emit manifest → re-read manifest → identical effective rule set
 
-## Phase 3: Installer Rewrite (`agentforge-core`) (open)
+## Phase 3: Installer Rewrite (`agentforge-core`) (done)
 
 Replace the current "copy the blob if missing" logic with a typed,
 idempotent, auditable installer built on the domain model.
 
-- [ ] Crate `agentforge-core` depends only on `agentforge-domain`; no filesystem access in the pure-logic layer (FS isolated behind a trait so it is unit-testable)
-- [ ] `InstallTarget` trait (filesystem abstraction) so install/upgrade/dry-run can be tested against an in-memory tree
-- [ ] Install flow: detect existing file → parse → compare manifest → decide `install` / `skip` / `upgrade` / `conflict`
-- [ ] Never overwrite a locally-edited rule silently: if a rule's body checksum differs from the baseline, the CLI reports the diff and requires explicit `--force` (the "zero silent data loss" policy)
-- [ ] `--dry-run` that prints exactly what would change, no writes
+- [x] Crate `agentforge-core` depends only on `agentforge-domain`; no filesystem access in the pure-logic layer (FS isolated behind a trait so it is unit-testable)
+- [x] `InstallTarget` trait (filesystem abstraction) so install/upgrade/dry-run can be tested against an in-memory tree
+- [x] Install flow: detect existing file → parse → compare manifest → decide `install` / `skip` / `upgrade` / `conflict`
+- [x] Never overwrite a locally-edited rule silently: if a rule's body checksum differs from the baseline, the CLI reports the diff and requires explicit `--force` (the "zero silent data loss" policy)
+- [x] `--dry-run` that prints exactly what would change, no writes
 - [ ] `--check` that exits non-zero (with a report) if the installed ruleset is older than the bundled baseline
-- [ ] Exit codes distinguishing: `already-installed`, `installed`, `upgraded`, `conflict-needs-confirmation`, `input-error`, `internal-error`
-- [ ] Unit tests: install-when-missing, skip-when-pristine, conflict-when-edited, force-overwrite, dry-run-touches-nothing
+- [x] Exit codes distinguishing: `installed`, `upgraded`, `skipped`, `conflict-needs-confirmation`, `input-error`, `internal-error`
+- [x] Unit tests: install-when-missing, skip-when-pristine, conflict-when-edited, force-overwrite, dry-run-touches-nothing, version-mismatch, corrupt-manifest
 
 ## Phase 4: Template Engine & Domain Templates (`agentforge-builder`) (open)
 
