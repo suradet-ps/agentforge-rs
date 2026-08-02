@@ -44,7 +44,7 @@ This is the phase that makes everything downstream possible.
 - [x] Workspace restructured: root `Cargo.toml` now a workspace with `crates/cargo-agentforge` and `crates/agentforge-domain`
 - [x] `serde` + `thiserror` added to workspace dependencies; `serde_json` as dev-dependency for manifest tests
 
-## Phase 2: Rule Manifest Format (`.agentforge.json` / versioned) (partially done)
+## Phase 2: Rule Manifest Format (`.agentforge.json` / versioned) (done)
 
 The markdown is for humans and agents. Tooling (CI, the CLI's own
 version-check, future IDE plugins) needs a stable, parseable artifact.
@@ -52,8 +52,8 @@ version-check, future IDE plugins) needs a stable, parseable artifact.
 - [x] Manifest fields: `manifest_version`, `ruleset_version`, `generated_at`, `rule_count`, `rules[]` (id, section, severity, tags, checksum of body), `overrides[]` — defined as `RuleManifest` / `ManifestRule` / `ManifestOverride` in `agentforge-domain`
 - [x] Per-rule body checksum so the CLI can detect "the user edited this rule locally" vs "this is a pristine baseline rule" — the foundation of safe updates (Phase 6); currently FNV-1a, will swap for real SHA-256
 - [x] Schema validation via `serde` deserialization; rejects malformed manifests with typed errors, never panics
-- [ ] Format specification written down (`docs/RULE_MANIFEST.md`): schema, versioning strategy (semver of the rule set, independent of the CLI version), forward/backward compatibility rules
-- [ ] Round-trip test: parse baseline → emit manifest → re-read manifest → identical effective rule set
+- [x] Format specification written down (`docs/RULE_MANIFEST.md`): schema, versioning strategy (semver of the rule set, independent of the CLI version), forward/backward compatibility rules
+- [x] Round-trip test: parse baseline → emit manifest → re-read manifest → identical effective rule set
 
 ## Phase 3: Installer Rewrite (`agentforge-core`) (open)
 
