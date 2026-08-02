@@ -1,0 +1,15 @@
+[package]
+name = "agentforge-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Install/upgrade logic for agentforge rule sets"
+
+[dependencies]
+agentforge-domain = { path = "../agentforge-domain" }
+thiserror.workspace = true
+serde_json = "1"
+
+[dev-dependencies]
