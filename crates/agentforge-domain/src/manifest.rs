@@ -114,6 +114,7 @@ fn sha256_hex(input: &str) -> String {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::r#override::Override;
   use crate::rule::{Rule, RuleSet, Severity};
   use crate::rule_id::RuleId;
 
@@ -191,5 +192,84 @@ mod tests {
     let json = serde_json::to_string_pretty(&m).unwrap();
     assert!(json.contains("\"manifest_version\": 1"));
     assert!(json.contains("\"ruleset_version\": \"0.1.0\""));
+  }
+
+  #[test]
+  fn round_trip() {
+    // 1. Build a RuleSet
+    let mut rs = RuleSet::new("1.0.0".into());
+    rs.add_rule(Rule::new(
+      RuleId::new("0").unwrap(),
+      "0".into(),
+      "Golden Rules".into(),
+      "These rules always apply.".into(),
+      Severity::Mandatory,
+    ))
+    .unwrap();
+    rs.add_rule(Rule::new(
+      RuleId::new("5.2").unwrap(),
+      "5".into(),
+      "Error Handling".into(),
+      "Use thiserror for library crates, anyhow for binaries.".into(),
+      Severity::Recommended,
+    ))
+    .unwrap();
+    rs.add_override(Override::new(
+      RuleId::new("5.2").unwrap(),
+      "Use anyhow for faster iteration.".into(),
+    ))
+    .unwrap();
+
+    // 2. Generate manifest
+    let m1 = RuleManifest::from_rule_set(&rs, "2026-01-01T00:00:00Z").unwrap();
+
+    // 3. Serialize to JSON
+    let json = serde_json::to_string(&m1).unwrap();
+
+    // 4. Deserialize back
+    let m2: RuleManifest = serde_json::from_str(&json).unwrap();
+
+    // 5. Verify identical
+    assert_eq!(m1, m2);
+    assert_eq!(m2.manifest_version, 1);
+    assert_eq!(m2.ruleset_version, "1.0.0");
+    assert_eq!(m2.rule_count, 2);
+    assert_eq!(m2.rules.len(), 2);
+    assert_eq!(m2.overrides.len(), 1);
+    assert_eq!(m2.rules[0].id, "0");
+    assert_eq!(m2.rules[1].id, "5.2");
+    assert_eq!(m2.overrides[0].target_rule_id, "5.2");
+    assert_eq!(m2.overrides[0].reason, "Use anyhow for faster iteration.");
+  }
+
+  #[test]
+  fn round_trip_empty_overrides() {
+    let mut rs = RuleSet::new("0.1.0".into());
+    rs.add_rule(Rule::new(
+      RuleId::new("1").unwrap(),
+      "1".into(),
+      "Agent Behavior".into(),
+      "Think before acting.".into(),
+      Severity::Mandatory,
+    ))
+    .unwrap();
+
+    let m1 = RuleManifest::from_rule_set(&rs, "2026-06-15T12:00:00Z").unwrap();
+    let json = serde_json::to_string_pretty(&m1).unwrap();
+    let m2: RuleManifest = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(m1, m2);
+    assert!(m2.overrides.is_empty());
+  }
+
+  #[test]
+  fn manifest_reproducible() {
+    // Same input, same timestamp → byte-identical JSON
+    let rs = make_ruleset();
+    let m1 = RuleManifest::from_rule_set(&rs, "2026-01-01T00:00:00Z").unwrap();
+    let m2 = RuleManifest::from_rule_set(&rs, "2026-01-01T00:00:00Z").unwrap();
+    let json1 = serde_json::to_string(&m1).unwrap();
+    let json2 = serde_json::to_string(&m2).unwrap();
+    assert_eq!(json1, json2);
   }
 }
