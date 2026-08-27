@@ -64,10 +64,11 @@ Run these in order. Do not skip any step. Show output or declare clean.
 
 ```bash
 cargo fmt --check                          # formatting
-cargo check                                # type-check without building
-cargo clippy -- -D warnings               # no warnings allowed
-cargo test                                 # all tests must pass
-cargo doc --no-deps 2>&1 | grep warning   # no doc warnings
+cargo check --all-targets                  # type-check without building (incl. tests/benches)
+cargo clippy --all-targets -- -D warnings  # no warnings allowed
+cargo test --all-features                  # all tests must pass
+cargo doc --no-deps 2>&1 | grep warning    # no doc warnings
+cargo deny check                           # advisories/bans/licenses - only if deny.toml exists
 ```
 
 If any step fails, fix the issue **before** reporting completion. Never report completion with known failures.
@@ -290,7 +291,8 @@ cargo check --all-targets
 cargo clippy --all-targets -- -D warnings
 cargo test --all-features
 cargo doc --no-deps
-cargo audit          # requires cargo-audit
+cargo deny check        # advisories/bans/licenses (requires cargo-deny and deny.toml)
+cargo audit             # requires cargo-audit
 ```
 
 For releases, additionally:
