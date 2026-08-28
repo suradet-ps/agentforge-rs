@@ -1,91 +1,148 @@
 # AgentForge-RS
 
-> The official `cargo` subcommand to bootstrap AI-ready Rust projects with `AGENTS-RUST.md`.  
-> One command. Zero configuration. Production-grade AI rules delivered instantly.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/Rust-1.95%2B-orange)](https://www.rust-lang.org)
-[![Cargo CLI](https://img.shields.io/badge/Cargo-Subcommand-blue)]()
-
-## What is this?
-
-`agentforge-rs` provides a lightweight CLI tool (`cargo agentforge`) that places a battle-tested `AGENTS-RUST.md` baseline into your project root. This file acts as a **constitution for AI coding agents**, enforcing:
-
-- Strict safety & idiomatic Rust patterns
-- Mandatory `clippy`, `fmt`, `test`, and `doc` validation
-- Predictable, tiered refactoring workflows
-- A formal `[OVERRIDE §X]` system for project-specific exceptions
-
-Stop manually copying rules. Stop guessing how your AI should behave. Just run `cargo agentforge` and start building.
-
-## Quick Start
-
-### 1. Install the CLI
-```bash
-cargo install --git https://github.com/suradet-ps/agentforge-rs cargo-agentforge
+```
+ █████╗  ██████╗███████╗███╗   ██╗████████╗███████╗ ██████╗ ██████╗  ██████╗███████╗
+██╔══██╗██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔════╝
+███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   █████╗  ██║   ██║██████╔╝██║  ███╗█████╗
+██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝
+██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
+╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚══════╝
 ```
 
-### 2. Use in Any Rust Project
-```bash
-cd your-rust-project
-cargo agentforge
+---
+
+## ◆ PULSE
+
+Your AI agent will behave how your rules tell it to. AgentForge-RS is the
+`cargo` subcommand that stops the guessing: one command places a
+battle-tested `AGENTS-RUST.md` constitution in the project root - 14
+enforceable sections on safety, idiom, validation, and refactoring - with
+a formal `[OVERRIDE §X]` system so real projects bend the rules without
+breaking them. One command. Zero configuration. The rules arrive as a
+typed, versioned, verifiable artifact - not a blob of prose.
+
+| P0 ▣ | P1 ▣ | P2 ▣ | P3 ▣ | P4-P11 ☐ |
+|---|---|---|---|---|
+
+*Foundation, the typed rule model, the manifest format, and the
+conflict-safe installer are sealed. The template engine, update pipeline,
+full CLI surface, and the v1.0 gate stand open.*
+
+> Built with pure Rust - zero dependencies, compiled once, works
+> everywhere. The install path never touches the network.
+>
+> **suradet-ps**, artifact keeper
+
+---
+
+## ◆ IGNITION
+
+Install once, forge everywhere.
+
+```
+⟫ cargo install --git https://github.com/suradet-ps/agentforge-rs cargo-agentforge
+⟫ cd your-rust-project
+⟫ cargo agentforge
 ```
 
-✅ `AGENTS-RUST.md` is now in your project root. Your AI agent will automatically read and follow it.
+`AGENTS-RUST.md` is now in your project root. Your AI agent reads it,
+and follows it.
 
-## How It Works
+Update the rules: `⟫ cargo install --git ... --force` to pull the latest
+baseline; `⟫ rm AGENTS-RUST.md && cargo agentforge` to re-install.
 
-| Step | Action |
-|------|--------|
-| `cargo agentforge` | Checks if `AGENTS-RUST.md` already exists |
-| Missing | Embeds the latest baseline template & writes it to root |
-| Exists | Skips installation & prints a reminder |
-| Update | Re-run `cargo install --git ... --force` to pull latest rules |
+<details>
+<summary>What the CLI does</summary>
 
-Built with pure Rust. Zero dependencies. Compiled once, works everywhere.
+| Situation | Action |
+|---|---|
+| No `AGENTS-RUST.md` | Embeds the latest baseline template, writes it to root |
+| Already present | Skips the install, prints a reminder |
+| Edited locally | Reports the diff; never overwrites without explicit `--force` |
+| Stale baseline | Detected via the versioned manifest; upgrade is deliberate |
 
-## What's Inside `AGENTS-RUST.md`?
+</details>
 
-The installed file contains **14 enforceable sections** covering:
-- `§0–2` Agent behavior, interaction protocols & golden rules
-- `§3–4` Mandatory checks, `Cargo.toml` & workspace standards
-- `§5–7` Ownership, error handling, async/tokio patterns
-- `§8–9` Testing hygiene & documentation standards
-- `§10–11` Security checklist & CI/release workflows
-- `§12–13` Refactoring workflow & anti-pattern table
-- `§14` Project Overrides system for safe rule exceptions
+---
 
-[View the full `AGENTS-RUST.md` source](./templates/AGENTS-RUST.md)
+## ◆ ANATOMY
 
-## The Override System (Built-In)
+Three crates, one contract: the rules are a typed model, not prose.
 
-Real projects need flexibility. Add exceptions directly in the generated file:
-```markdown
-## 14. Project Overrides
-[OVERRIDE §5.2] Use `anyhow` instead of `thiserror` for faster iteration
-[OVERRIDE §4.1] edition = "2021" (legacy dependency requirement)
+- **Models** - `agentforge-domain` turns the constitution into typed
+  entities: `RuleId` (validated, orderable), `Rule` with severity and
+  machine-readable tags, `Override` with target validation, and the
+  `RuleSet` that rejects duplicate ids and orphan overrides. Thirty
+  tests hold the model together.
+- **Manifests** - every rule carries a body checksum in a versioned
+  `.agentforge.json` companion, so tooling knows "what version of the
+  rules is installed" without parsing prose - and can tell a pristine
+  baseline from a locally edited rule.
+- **Installs** - `agentforge-core` runs the flow: detect, parse, compare
+  manifest, then `install` / `skip` / `upgrade` / `conflict`. Local edits
+  are never overwritten silently - the diff is reported, `--force` is
+  required, `--dry-run` touches nothing. Filesystem access stays behind a
+  trait so the whole flow is unit-tested against an in-memory tree.
+- **Ships** - the `cargo-agentforge` binary is the cargo subcommand
+  itself: zero dependencies, cross-platform release builds, checksums on
+  every release, offline by construction.
+
+---
+
+## ◆ RITUALS
+
+**The core ceremony** - bootstrap any Rust project:
+
+1. `cargo agentforge` in the project root.
+2. The constitution appears: 14 sections from agent behavior through
+   anti-patterns, ending at the Project Overrides section.
+3. Where the project genuinely differs, write `[OVERRIDE §X]` lines -
+   agents read them at runtime and adjust without breaking baseline
+   compliance.
+4. The mandatory checks take over: `clippy -D warnings`, `fmt`, `test`,
+   `doc` - the gates your agents will hold.
+
+**The ceremony of safety** - nothing is overwritten without consent. A
+locally edited rule is reported, never silently replaced. `--dry-run`
+prints exactly what would change and changes nothing.
+
+**The ceremony of silence** - the install path is offline by default:
+the template is embedded at compile time, no network, no phone-home.
+
+---
+
+## ◆ ECHOES
+
+**Where this artifact is heading**
+
 ```
-AI agents read overrides at runtime and adjust behavior without breaking baseline compliance.
-
-## Maintenance & Updates
-
-```bash
-# Update the CLI to the latest version
-cargo install --git https://github.com/suradet-ps/agentforge-rs cargo-agentforge --force
-
-# Update the rules in an existing project
-rm AGENTS-RUST.md && cargo agentforge
+P0-P3 ▸ foundation, rule model, manifest, installer ────────────── ▸ sealed
+P4    ▸ template engine: wasm, tauri, bevy, embedded, axum ──────── ▸ open
+P5    ▸ rules pipeline: pinned TLS-fetched updates, reproducible ▸ ▸ ▸ open
+P6    ▸ full CLI surface: init, check, diff, validate, templates ── ▸ open
+P7    ▸ TUI installer (ratatui), stretch ─────────────────────────── ▸ open
+P8-P10 ▸ golden-rule suite, perf budgets, security hardening ─────── ▸ open
+P11   ▸ v1.0.0: crates.io publish, docs book, release gate ──────── ▸ open
 ```
 
-## Contributing
+**Raising the artifact** - this is a living standard. Bug reports,
+AI edge-case discoveries, rule refinements, anti-pattern additions, and
+domain templates are all welcomed - reference the `§` section you are
+modifying. `CONTRIBUTING.md` and `SECURITY.md` hold the ground rules;
+`ROADMAP.md` holds the honest path. The domain spec lives in
+`docs/RULE_MANIFEST.md`.
 
-This project is a living standard. We welcome:
-- Bug reports & AI edge-case discoveries
-- Rule refinements, anti-pattern additions, or workflow improvements
-- Translations or domain-specific templates (Tauri, Bevy, Embedded, WASM)
+**Status** - CI gates every change: fmt, `clippy -D warnings`, tests,
+cargo-audit + cargo-deny, and cross-platform release builds
+(Linux / Windows / macOS). [Watch the gates](.github/workflows).
 
-Open an issue or PR. Please reference the `§` section you're modifying.
+---
 
-## License
+```
+  ─────────────────────────────────────────
+   Your agent is only as disciplined
+   as the rules you forge for it.
+  ─────────────────────────────────────────
+```
 
-Distributed under the **MIT License**. See `LICENSE` for details.
+Distributed under the [MIT License](LICENSE).
