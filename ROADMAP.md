@@ -39,6 +39,7 @@ This is the phase that makes everything downstream possible.
 - [x] `Override` entity: a `[OVERRIDE §X]` parsed into target rule id + replacement / exemption, with validation that the target id actually exists in the baseline; `parse_line()` handles the bracket/section format
 - [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides + recorded section headings (`Section { id, title }`), with `add_rule()` / `add_override()` / `add_section()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
 - [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N` or `## WASM-1`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
+- [x] Lenient validator (`validate_agents_md`): same scan reports **every** issue with line numbers (`MalformedHeading`, `DuplicateRuleId`, `DuplicateSection`, `DuplicateOverride`, `MalformedOverride`, `OrphanOverride`, `EmptyRuleSet`) instead of stopping at the first; JSON-serializable `ValidationReport`
 - [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule body checksums (FNV-1a placeholder for SHA-256), JSON serializable
 - [x] Domain error types with `thiserror`; typed errors for `InvalidRuleId`, `DuplicateRuleId`, `OverrideTargetNotFound`, `DuplicateOverride`, `EmptyRuleSet`, `MissingField`, `ManifestVersionMismatch`
 - [x] Unit tests: 30 tests covering rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering, override parsing (valid/invalid/edge cases), manifest generation, serialization round-trip
@@ -103,12 +104,12 @@ Expand the single install command into a coherent, scriptable CLI.
 
 - [x] `cargo agentforge init [--force] [--dry-run]` — install/upgrade, wired to `agentforge-core` (default subcommand; `--template` lands with Phase 4)
 - [x] `cargo agentforge check` — report installed ruleset version vs bundled baseline, non-zero on stale (`ExitCode::Stale`/`NotInstalled`); "vs latest" (network) lands with Phase 5
-- [ ] `cargo agentforge update-rules [--yes]` — explicit, confirmed network fetch; never automatic
-- [ ] `cargo agentforge diff` — show a unified diff between installed and target ruleset, honoring local edits
-- [ ] `cargo agentforge validate` — parse the project's `AGENTS-RUST.md`, report malformed overrides or stale rule ids
+- [ ] `cargo agentforge update-rules [--yes]` — explicit, confirmed network fetch; never automatic (Phase 5)
+- [x] `cargo agentforge diff` — rule-level diff between installed and target ruleset, honoring local edits (parses the actual `AGENTS-RUST.md`, detects the installed template selection, compares body checksums; `ExitCode::HasDiff` on any change)
+- [x] `cargo agentforge validate` — parses the project's `AGENTS-RUST.md` and reports **every** malformed override, orphan override, duplicate id, and malformed heading with line numbers (`validate_agents_md`; non-zero on issues)
 - [x] `cargo agentforge version` — prints CLI version, never touches network or filesystem
 - [x] `cargo agentforge templates` — lists available domain templates and their descriptions
-- [ ] Plain-text and `--json` output for `check`/`validate`/`diff` so CI can consume them
+- [x] Plain-text and `--json` output for `check`/`validate`/`diff` so CI can consume them
 - [ ] All network-touching commands gated on explicit user confirmation; no silent phone-home
 
 ## Phase 7: TUI / Interactive Installer (open, stretch)

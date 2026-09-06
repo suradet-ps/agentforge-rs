@@ -4,13 +4,14 @@
 use std::cmp::Ordering;
 
 use agentforge_domain::manifest::RuleManifest;
+use serde::Serialize;
 
 use crate::exit::ExitCode;
 use crate::fs::InstallTarget;
 use crate::install::{Config, CoreError};
 
 /// Result of comparing the installed ruleset against a target (bundled) one.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum CheckStatus {
   /// Installed ruleset is not older than the bundled baseline.
   UpToDate,

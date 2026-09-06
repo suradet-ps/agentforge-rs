@@ -16,6 +16,7 @@ name = "agentforge-core"
 version = "0.1.0"
 dependencies = [
  "agentforge-domain",
+ "serde",
  "serde_json",
  "thiserror",
 ]
@@ -87,6 +88,8 @@ dependencies = [
  "agentforge-core",
  "agentforge-domain",
  "clap",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

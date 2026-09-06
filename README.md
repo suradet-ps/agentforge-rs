@@ -26,8 +26,8 @@ typed, versioned, verifiable artifact - not a blob of prose.
 
 *Foundation, the typed rule model, the manifest format, the conflict-safe
 installer, and the template engine (7 domain fragments) are sealed. The
-rules update pipeline, the remaining CLI surface, the TUI, and the v1.0
-gate stand open.*
+rules update pipeline (Phase 5), the remaining CLI surface (`update-rules`),
+the TUI, and the v1.0 gate stand open.*
 
 > Built with pure Rust. The install path never touches the network -
 > the constitution is embedded at compile time.
@@ -47,6 +47,8 @@ Install once, forge everywhere.
 ⟫ cargo agentforge init --template wasm,tauri  # compose domain fragments into it
 ⟫ cargo agentforge templates                 # list the available fragments
 ⟫ cargo agentforge check                     # up to date? exits non-zero when stale
+⟫ cargo agentforge validate                  # every issue in the installed file, with line numbers
+⟫ cargo agentforge diff                      # rule-level diff vs the target (honors local edits)
 ⟫ cargo agentforge version
 ```
 
@@ -58,6 +60,11 @@ verbatim).
 Domain fragments (`wasm`, `tauri`, `bevy`, `embedded`, `axum`, `cli`,
 `library`) extend the constitution with typed, namespaced rules that merge
 cleanly into the core — no network, everything embedded at compile time.
+
+`check`, `validate`, and `diff` also accept `--json` for CI consumption;
+every command exits `0` on success and a documented non-zero code when
+something needs attention (conflict `3`, stale `4`, not-installed `5`,
+diff `6`, input error `2`).
 
 Update the rules: `⟫ cargo install --git ... --force` to pull the latest
 baseline; `⟫ cargo agentforge init --force` to overwrite a locally edited
@@ -146,7 +153,7 @@ the template is embedded at compile time, no network, no phone-home.
 ```
 P0-P4 ▸ foundation, model, manifest, installer, template engine ─── ▸ sealed
 P5    ▸ rules pipeline: pinned TLS-fetched updates, reproducible ▸ ▸ ▸ open
-P6    ▸ CLI surface: init/check/version/templates ▸ sealed; diff/validate ▸ open
+P6    ▸ CLI surface: init/check/version/templates/validate/diff ▸ sealed
 P7    ▸ TUI installer (ratatui), stretch ─────────────────────────── ▸ open
 P8-P10 ▸ golden-rule suite, perf budgets, security hardening ─────── ▸ open
 P11   ▸ v1.0.0: crates.io publish, docs book, release gate ──────── ▸ open

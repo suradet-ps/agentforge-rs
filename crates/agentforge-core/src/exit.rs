@@ -12,6 +12,7 @@ pub enum ExitCode {
   InternalError,
   Stale,
   NotInstalled,
+  HasDiff,
 }
 
 impl ExitCode {
@@ -26,6 +27,7 @@ impl ExitCode {
       Self::InternalError => 1,
       Self::Stale => 4,
       Self::NotInstalled => 5,
+      Self::HasDiff => 6,
     }
   }
 }
@@ -45,6 +47,7 @@ impl fmt::Display for ExitCode {
         "stale (installed ruleset is older than the bundled baseline)"
       ),
       Self::NotInstalled => write!(f, "not installed (no manifest found)"),
+      Self::HasDiff => write!(f, "diff (installed ruleset differs from the target)"),
     }
   }
 }
@@ -64,6 +67,7 @@ mod tests {
     assert_eq!(ExitCode::InternalError.as_i32(), 1);
     assert_eq!(ExitCode::Stale.as_i32(), 4);
     assert_eq!(ExitCode::NotInstalled.as_i32(), 5);
+    assert_eq!(ExitCode::HasDiff.as_i32(), 6);
   }
 
   #[test]

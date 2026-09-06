@@ -12,6 +12,8 @@ agentforge-builder = { path = "../agentforge-builder" }
 agentforge-domain = { path = "../agentforge-domain" }
 agentforge-core = { path = "../agentforge-core" }
 clap = { version = "4", features = ["derive"] }
+serde.workspace = true
+serde_json = "1"
 
 [[bin]]
 name = "cargo-agentforge"
