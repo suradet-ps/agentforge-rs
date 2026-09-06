@@ -121,7 +121,7 @@ Expand the single install command into a coherent, scriptable CLI.
 - [ ] Keyboard-only navigation (no mouse required)
 - [ ] Verified interactively in a real terminal (tmux), with a regression test for "cancel clears selection, does not write"
 
-## Phase 8: Safety / Golden Rule Suite (open)
+## Phase 8: Safety / Golden Rule Suite (done)
 
 The equivalent of MenSung's medical safety gate: we must never ship a
 ruleset that is internally inconsistent or that silently weakens a
