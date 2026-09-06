@@ -133,7 +133,7 @@ mandatory rule.
 - [x] Property-based tests for override resolution (deterministic seeded-PRNG sweeps: every override resolves to an existing rule, orphans are rejected, applying then reverting is a no-op on pristine rules; parse→render→parse round-trip is stable and rendering is idempotent across 500 generated documents; the parser never panics on 3000 random malformed inputs)
 - [x] "Zero silent downgrade" test: removing or weakening a `Mandatory` golden rule (e.g. §3, §5.2) is detected by the gate
 
-## Phase 9: Performance Hardening (open)
+## Phase 9: Performance Hardening (done)
 
 - [x] Benchmark harness (criterion) for build/compose and install time — `crates/agentforge-builder/benches/bench.rs` (build core-only ~50µs, build all templates, parse core), minimal feature set (no plotters)
 - [x] Install `<50ms` for core-only on a warm filesystem, `<200ms` with all templates, verified in CI (`scripts/perf-check.sh`, `.github/workflows/perf.yml`) — measured ~3ms locally, budgets are generous for slow runners

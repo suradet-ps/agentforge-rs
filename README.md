@@ -25,9 +25,10 @@ typed, versioned, verifiable artifact - not a blob of prose.
 |---|---|---|---|
 
 *Foundation, the typed rule model, the manifest format, the conflict-safe
-installer, the template engine (7 domain fragments), and the golden-rule
-safety gate are sealed. The rules update pipeline (Phase 5), the remaining
-CLI surface (`update-rules`), the TUI, and the v1.0 gate stand open.*
+installer, the template engine (7 domain fragments), the golden-rule
+safety gate, and the performance budgets are sealed. The rules update
+pipeline (network half), the TUI, security hardening, and the v1.0 gate
+stand open.*
 
 > Built with pure Rust. The install path never touches the network -
 > the constitution is embedded at compile time.
@@ -128,9 +129,12 @@ Four crates, one contract: the rules are a typed model, not prose.
   builds.
 - **Ships** - the `cargo-agentforge` binary is the cargo subcommand
   itself: `init [--template ...]` / `check` / `version` / `templates` /
-  `validate` / `diff` over a dependency-light CLI, the pure-logic core
-  kept dependency-free behind a filesystem trait, cross-platform release
-  builds, checksums on every release, offline by construction.
+  `validate` / `diff` / `verify` over a dependency-light CLI, the
+  pure-logic core kept dependency-free behind a filesystem trait,
+  cross-platform release builds, checksums on every release, offline by
+  construction. Perf budgets are enforced in CI (`scripts/perf-check.sh`):
+  `<5MB` stripped binary, `<100ms` startup, `<50ms` core install,
+  `<20MB` resident.
 
 ---
 
@@ -166,7 +170,8 @@ P5    ▸ rules pipeline: reproducible builds + validation gate ▸ sealed; netw
 P6    ▸ CLI surface: init/check/version/templates/validate/diff ▸ sealed
 P7    ▸ TUI installer (ratatui), stretch ─────────────────────────── ▸ open
 P8    ▸ golden-rule gate, property tests, fuzz target ────────────── ▸ sealed
-P9-P10 ▸ perf budgets, security hardening ────────────────────────── ▸ open
+P9    ▸ perf budgets: size <5MB, startup <100ms, install <50ms ▸ ▸ ▸ sealed
+P10   ▸ security hardening ───────────────────────────────────────── ▸ open
 P11   ▸ v1.0.0: crates.io publish, docs book, release gate ──────── ▸ open
 ```
 
