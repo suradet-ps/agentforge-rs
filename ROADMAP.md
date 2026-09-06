@@ -94,8 +94,8 @@ distribution** from **CLI distribution**.
 - [ ] Ruleset published as a standalone release asset (`agentforge-rules-<version>.tar.zst`) separate from the binary, so updating rules does not require reinstalling the CLI
 - [ ] Reproducible build: same input manifest → byte-identical `AGENTS-RUST.md` output (deterministic section ordering, no timestamps in output unless `--emit-metadata`)
 - [x] `SOURCE_DATE_EPOCH` support for reproducible builds (`generated_at_from_epoch` — hand-rolled civil-from-days, no `chrono` dep)
-- [ ] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest
-- [ ] `validation-report.json` output (`errors`, `warnings`, `rule_count`, `fragment_count`)
+- [x] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest (`validation_report` in `agentforge-builder`)
+- [x] `validation-report.json` output (`errors`, `warnings`, `rule_count`, `fragment_count`); warns when an override weakens a `Mandatory` rule
 - [ ] Unit + integration tests against a fixture ruleset; the live-network fetch is `#[ignore]`d like MenSung's real-API tests
 
 ## Phase 6: CLI Surface (`cargo-agentforge`) (open)
