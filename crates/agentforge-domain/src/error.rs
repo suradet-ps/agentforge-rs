@@ -22,4 +22,7 @@ pub enum DomainError {
 
   #[error("manifest version mismatch: expected {expected}, got {actual}")]
   ManifestVersionMismatch { expected: String, actual: String },
+
+  #[error("failed to parse AGENTS-RUST.md: {0}")]
+  Parse(String),
 }

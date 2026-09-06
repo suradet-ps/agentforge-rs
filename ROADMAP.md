@@ -38,6 +38,7 @@ This is the phase that makes everything downstream possible.
 - [x] `Rule` entity: id, section, title, body, severity (`Mandatory` / `Recommended` / `Advisory`), machine-readable tag set (`tokio`, `unsafe`, `testing`, …); case-insensitive tag lookup
 - [x] `Override` entity: a `[OVERRIDE §X]` parsed into target rule id + replacement / exemption, with validation that the target id actually exists in the baseline; `parse_line()` handles the bracket/section format
 - [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides, with `add_rule()` / `add_override()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
+- [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
 - [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule body checksums (FNV-1a placeholder for SHA-256), JSON serializable
 - [x] Domain error types with `thiserror`; typed errors for `InvalidRuleId`, `DuplicateRuleId`, `OverrideTargetNotFound`, `DuplicateOverride`, `EmptyRuleSet`, `MissingField`, `ManifestVersionMismatch`
 - [x] Unit tests: 30 tests covering rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering, override parsing (valid/invalid/edge cases), manifest generation, serialization round-trip
@@ -62,10 +63,10 @@ idempotent, auditable installer built on the domain model.
 
 - [x] Crate `agentforge-core` depends only on `agentforge-domain`; no filesystem access in the pure-logic layer (FS isolated behind a trait so it is unit-testable)
 - [x] `InstallTarget` trait (filesystem abstraction) so install/upgrade/dry-run can be tested against an in-memory tree
-- [x] Install flow: detect existing file → parse → compare manifest → decide `install` / `skip` / `upgrade` / `conflict`
+- [x] Install flow: detect existing file → parse → compare manifest → decide `install` / `skip` / `upgrade` / `conflict`; the `AGENTS-RUST.md` template is written **verbatim** (never regenerated from the manifest), and skip-detection ignores `generated_at` so re-installs of an identical ruleset are idempotent
 - [x] Never overwrite a locally-edited rule silently: if a rule's body checksum differs from the baseline, the CLI reports the diff and requires explicit `--force` (the "zero silent data loss" policy)
 - [x] `--dry-run` that prints exactly what would change, no writes
-- [ ] `--check` that exits non-zero (with a report) if the installed ruleset is older than the bundled baseline
+- [x] `--check` that exits non-zero (with a report) if the installed ruleset is older than the bundled baseline (`check_status` in `agentforge-core`; `CheckStatus::{UpToDate, Stale, NotInstalled}`, `ExitCode::Stale`/`NotInstalled`)
 - [x] Exit codes distinguishing: `installed`, `upgraded`, `skipped`, `conflict-needs-confirmation`, `input-error`, `internal-error`
 - [x] Unit tests: install-when-missing, skip-when-pristine, conflict-when-edited, force-overwrite, dry-run-touches-nothing, version-mismatch, corrupt-manifest
 
@@ -100,12 +101,12 @@ distribution** from **CLI distribution**.
 
 Expand the single install command into a coherent, scriptable CLI.
 
-- [ ] `cargo agentforge init [--template ...] [--force] [--dry-run]` — install/upgrade
-- [ ] `cargo agentforge check` — report installed ruleset version vs bundled/latest, non-zero on stale
+- [x] `cargo agentforge init [--force] [--dry-run]` — install/upgrade, wired to `agentforge-core` (default subcommand; `--template` lands with Phase 4)
+- [x] `cargo agentforge check` — report installed ruleset version vs bundled baseline, non-zero on stale (`ExitCode::Stale`/`NotInstalled`); "vs latest" (network) lands with Phase 5
 - [ ] `cargo agentforge update-rules [--yes]` — explicit, confirmed network fetch; never automatic
 - [ ] `cargo agentforge diff` — show a unified diff between installed and target ruleset, honoring local edits
 - [ ] `cargo agentforge validate` — parse the project's `AGENTS-RUST.md`, report malformed overrides or stale rule ids
-- [ ] `cargo agentforge version` — prints CLI version, never touches network or filesystem
+- [x] `cargo agentforge version` — prints CLI version, never touches network or filesystem
 - [ ] `cargo agentforge templates` — lists available domain templates and their descriptions
 - [ ] Plain-text and `--json` output for `check`/`validate`/`diff` so CI can consume them
 - [ ] All network-touching commands gated on explicit user confirmation; no silent phone-home
