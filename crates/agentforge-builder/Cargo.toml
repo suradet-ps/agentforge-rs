@@ -10,3 +10,6 @@ description = "Composes the core constitution with domain template fragments"
 [dependencies]
 agentforge-domain = { path = "../agentforge-domain" }
 thiserror.workspace = true
+
+[dev-dependencies]
+serde_json = "1"

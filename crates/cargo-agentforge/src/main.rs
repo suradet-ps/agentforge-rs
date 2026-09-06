@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 
+use agentforge_builder::{CORE_TEMPLATE, GENERATED_AT, RULESET_VERSION};
 use agentforge_core::{Config, CoreError, ExitCode, RealFs, check_status, install};
 use agentforge_domain::RuleManifest;
 
@@ -13,15 +14,6 @@ use clap::{Args, Parser, Subcommand};
 
 const AGENTS_FILE: &str = "AGENTS-RUST.md";
 const MANIFEST_FILE: &str = ".agentforge.json";
-
-const TEMPLATE: &str = include_str!("../templates/AGENTS-RUST.md");
-
-/// Version of the bundled rule set, independent of the CLI version.
-const RULESET_VERSION: &str = "0.1.0";
-
-/// Fixed generation timestamp so repeated installs produce byte-identical
-/// manifests (and therefore idempotent `skip` outcomes).
-const GENERATED_AT: &str = "2026-01-01T00:00:00Z";
 
 #[derive(Parser)]
 #[command(
@@ -80,7 +72,7 @@ fn run_init(args: &InitArgs) -> ExitCode {
 
   let config = Config {
     manifest,
-    agents_md: TEMPLATE.to_string(),
+    agents_md: CORE_TEMPLATE.to_string(),
     agents_md_path: PathBuf::from(AGENTS_FILE),
     manifest_path: PathBuf::from(MANIFEST_FILE),
     force: args.force,
@@ -143,7 +135,7 @@ fn run_check() -> ExitCode {
 
 /// Parse the embedded template into the manifest used for install/check.
 fn bundled_manifest() -> Result<RuleManifest, agentforge_domain::DomainError> {
-  let ruleset = agentforge_domain::parse_agents_md(TEMPLATE, RULESET_VERSION)?;
+  let ruleset = agentforge_domain::parse_agents_md(CORE_TEMPLATE, RULESET_VERSION)?;
   RuleManifest::from_rule_set(&ruleset, GENERATED_AT)
 }
 
@@ -206,7 +198,7 @@ mod tests {
 
   #[test]
   fn bundled_template_parses_all_sections() {
-    let ruleset = agentforge_domain::parse_agents_md(TEMPLATE, RULESET_VERSION).unwrap();
+    let ruleset = agentforge_domain::parse_agents_md(CORE_TEMPLATE, RULESET_VERSION).unwrap();
     let ids: Vec<String> = ruleset.rules.iter().map(|r| r.id.to_string()).collect();
     assert_eq!(ruleset.rules.len(), 27);
     assert_eq!(ids[0], "0");

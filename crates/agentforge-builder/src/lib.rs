@@ -2,12 +2,16 @@
 //! validated, deterministic `AGENTS-RUST.md` and its manifest.
 
 mod render;
+pub mod templates;
 
 use agentforge_domain::error::DomainError;
 use agentforge_domain::manifest::RuleManifest;
 use agentforge_domain::rule::RuleSet;
 
 pub use render::render_agents_md;
+pub use templates::{
+  CORE_TEMPLATE, GENERATED_AT, RULESET_VERSION, TEMPLATES, get_template, resolve_selection,
+};
 
 /// Errors surfaced while building a composed ruleset.
 #[derive(Debug, thiserror::Error)]
@@ -280,6 +284,61 @@ mod tests {
     for (a, b) in out.ruleset.rules.iter().zip(reparsed.rules.iter()) {
       assert_eq!(a.id, b.id);
       assert_eq!(a.body, b.body);
+    }
+  }
+
+  #[test]
+  fn every_shipped_template_merges_cleanly() {
+    let frags: Vec<(&str, &str)> = templates::TEMPLATES
+      .iter()
+      .map(|t| (t.name, t.markdown))
+      .collect();
+    // Each template must merge on its own…
+    for t in templates::TEMPLATES {
+      let single = [("x", t.markdown)];
+      build(&BuildConfig {
+        core_template: templates::CORE_TEMPLATE,
+        fragments: &single,
+        version: templates::RULESET_VERSION,
+        generated_at: templates::GENERATED_AT,
+      })
+      .unwrap();
+    }
+    // …and all of them combined must not collide.
+    let out = build(&BuildConfig {
+      core_template: templates::CORE_TEMPLATE,
+      fragments: &frags,
+      version: templates::RULESET_VERSION,
+      generated_at: templates::GENERATED_AT,
+    })
+    .unwrap();
+    assert_eq!(out.manifest.rule_count, out.ruleset.rules.len());
+    assert!(out.manifest.rule_count > templates::TEMPLATES.len());
+  }
+
+  #[test]
+  fn every_shipped_template_round_trips_through_manifest() {
+    for t in templates::TEMPLATES {
+      let frags = [(t.name, t.markdown)];
+      let out = build(&BuildConfig {
+        core_template: templates::CORE_TEMPLATE,
+        fragments: &frags,
+        version: templates::RULESET_VERSION,
+        generated_at: templates::GENERATED_AT,
+      })
+      .unwrap();
+      // manifest → JSON → manifest round-trips losslessly
+      let json = serde_json::to_string(&out.manifest).unwrap();
+      let reparsed: RuleManifest = serde_json::from_str(&json).unwrap();
+      assert_eq!(reparsed, out.manifest, "template `{}`", t.name);
+      // composed markdown re-parses to the same effective rules
+      let md_rs = parse_agents_md(&out.markdown, templates::RULESET_VERSION).unwrap();
+      assert_eq!(
+        md_rs.rules.len(),
+        out.ruleset.rules.len(),
+        "template `{}`",
+        t.name
+      );
     }
   }
 }
