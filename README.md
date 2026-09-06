@@ -28,8 +28,8 @@ typed, versioned, verifiable artifact - not a blob of prose.
 conflict-safe installer are sealed. The template engine, update pipeline,
 full CLI surface, and the v1.0 gate stand open.*
 
-> Built with pure Rust - zero dependencies, compiled once, works
-> everywhere. The install path never touches the network.
+> Built with pure Rust. The install path never touches the network -
+> the constitution is embedded at compile time.
 >
 > **suradet-ps**, artifact keeper
 
@@ -42,14 +42,19 @@ Install once, forge everywhere.
 ```
 ⟫ cargo install --git https://github.com/suradet-ps/agentforge-rs cargo-agentforge
 ⟫ cd your-rust-project
-⟫ cargo agentforge
+⟫ cargo agentforge init       # install or upgrade the constitution
+⟫ cargo agentforge check      # up to date? exits non-zero when stale
+⟫ cargo agentforge version
 ```
 
 `AGENTS-RUST.md` is now in your project root. Your AI agent reads it,
-and follows it.
+and follows it. `init` is the default subcommand, so bare
+`⟫ cargo agentforge` behaves the same.
 
 Update the rules: `⟫ cargo install --git ... --force` to pull the latest
-baseline; `⟫ rm AGENTS-RUST.md && cargo agentforge` to re-install.
+baseline; `⟫ cargo agentforge init --force` to overwrite a locally edited
+constitution; `⟫ cargo agentforge init --dry-run` to preview before
+writing.
 
 <details>
 <summary>What the CLI does</summary>
@@ -59,9 +64,13 @@ baseline; `⟫ rm AGENTS-RUST.md && cargo agentforge` to re-install.
 | No `AGENTS-RUST.md` | Embeds the latest baseline template, writes it to root |
 | Already present | Skips the install, prints a reminder |
 | Edited locally | Reports the diff; never overwrites without explicit `--force` |
-| Stale baseline | Detected via the versioned manifest; upgrade is deliberate |
+| Stale baseline | `check` exits non-zero via the versioned manifest; upgrade is deliberate |
 
 </details>
+
+The template is written **verbatim** — tooling never rewrites the
+constitution from the manifest, so the battle-tested prose survives
+installs and upgrades.
 
 ---
 
@@ -71,9 +80,10 @@ Three crates, one contract: the rules are a typed model, not prose.
 
 - **Models** - `agentforge-domain` turns the constitution into typed
   entities: `RuleId` (validated, orderable), `Rule` with severity and
-  machine-readable tags, `Override` with target validation, and the
-  `RuleSet` that rejects duplicate ids and orphan overrides. Thirty
-  tests hold the model together.
+  machine-readable tags, `Override` with target validation, the
+  `RuleSet` that rejects duplicate ids and orphan overrides, and a
+  code-fence-aware markdown parser that maps `AGENTS-RUST.md` into that
+  model without ever panicking. 43 tests hold the model together.
 - **Manifests** - every rule carries a body checksum in a versioned
   `.agentforge.json` companion, so tooling knows "what version of the
   rules is installed" without parsing prose - and can tell a pristine
@@ -84,8 +94,10 @@ Three crates, one contract: the rules are a typed model, not prose.
   required, `--dry-run` touches nothing. Filesystem access stays behind a
   trait so the whole flow is unit-tested against an in-memory tree.
 - **Ships** - the `cargo-agentforge` binary is the cargo subcommand
-  itself: zero dependencies, cross-platform release builds, checksums on
-  every release, offline by construction.
+  itself: `init` / `check` / `version` over a dependency-light CLI, the
+  pure-logic core kept dependency-free behind a filesystem trait,
+  cross-platform release builds, checksums on every release, offline by
+  construction.
 
 ---
 
@@ -119,7 +131,7 @@ the template is embedded at compile time, no network, no phone-home.
 P0-P3 ▸ foundation, rule model, manifest, installer ────────────── ▸ sealed
 P4    ▸ template engine: wasm, tauri, bevy, embedded, axum ──────── ▸ open
 P5    ▸ rules pipeline: pinned TLS-fetched updates, reproducible ▸ ▸ ▸ open
-P6    ▸ full CLI surface: init, check, diff, validate, templates ── ▸ open
+P6    ▸ CLI surface: init/check/version ▸ sealed; diff/validate ▸ open
 P7    ▸ TUI installer (ratatui), stretch ─────────────────────────── ▸ open
 P8-P10 ▸ golden-rule suite, perf budgets, security hardening ─────── ▸ open
 P11   ▸ v1.0.0: crates.io publish, docs book, release gate ──────── ▸ open
