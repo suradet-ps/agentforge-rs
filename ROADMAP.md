@@ -70,7 +70,7 @@ idempotent, auditable installer built on the domain model.
 - [x] Exit codes distinguishing: `installed`, `upgraded`, `skipped`, `conflict-needs-confirmation`, `input-error`, `internal-error`
 - [x] Unit tests: install-when-missing, skip-when-pristine, conflict-when-edited, force-overwrite, dry-run-touches-nothing, version-mismatch, corrupt-manifest
 
-## Phase 4: Template Engine & Domain Templates (`agentforge-builder`) (open)
+## Phase 4: Template Engine & Domain Templates (`agentforge-builder`) (done)
 
 One monolithic `AGENTS-RUST.md` cannot serve WASM, kernel, and web
 equally. The constitution becomes a **core + pluggable domain layer**.
