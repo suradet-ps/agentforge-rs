@@ -36,7 +36,15 @@ use crate::rule_id::RuleId;
 /// for invalid override directives, [`DomainError::EmptyRuleSet`] when no
 /// rules are present, and [`DomainError::Parse`] for structural problems.
 pub fn parse_agents_md(source: &str, version: &str) -> Result<RuleSet, DomainError> {
-  Parser::new(version).parse(source)
+  Parser::new(version).parse(source, true)
+}
+
+/// Parse a domain fragment where `[OVERRIDE §X]` targets may reference rules
+/// in the *composed* set (core + other fragments) rather than the fragment
+/// alone. Override targets are therefore **not** validated here; the caller
+/// (the builder) validates them after merging.
+pub fn parse_agents_md_fragment(source: &str, version: &str) -> Result<RuleSet, DomainError> {
+  Parser::new(version).parse(source, false)
 }
 
 struct Pending {
@@ -54,6 +62,7 @@ struct Parser<'a> {
   pending: Option<Pending>,
   current_section: Option<String>,
   in_code_fence: bool,
+  validate_overrides: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -66,10 +75,12 @@ impl<'a> Parser<'a> {
       pending: None,
       current_section: None,
       in_code_fence: false,
+      validate_overrides: true,
     }
   }
 
-  fn parse(mut self, source: &str) -> Result<RuleSet, DomainError> {
+  fn parse(mut self, source: &str, validate_overrides: bool) -> Result<RuleSet, DomainError> {
+    self.validate_overrides = validate_overrides;
     for line in source.lines() {
       let trimmed = line.trim();
 
@@ -154,7 +165,11 @@ impl<'a> Parser<'a> {
       rs.add_rule(rule)?;
     }
     for ovr in self.overrides {
-      rs.add_override(ovr)?;
+      if self.validate_overrides {
+        rs.add_override(ovr)?;
+      } else {
+        rs.overrides.push(ovr);
+      }
     }
     Ok(rs)
   }

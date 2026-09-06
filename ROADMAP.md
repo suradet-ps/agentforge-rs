@@ -75,12 +75,12 @@ idempotent, auditable installer built on the domain model.
 One monolithic `AGENTS-RUST.md` cannot serve WASM, kernel, and web
 equally. The constitution becomes a **core + pluggable domain layer**.
 
-- [ ] Crate `agentforge-builder`: composes the core constitution with zero or more domain template fragments into the final `AGENTS-RUST.md`
-- [ ] Fragment format: each domain template is itself a validated `RuleSet` fragment with its own section range (e.g. `§WASM-1..`), merged without id collisions
+- [x] Crate `agentforge-builder`: composes the core constitution with zero or more domain template fragments into the final `AGENTS-RUST.md`; core-only builds return the verbatim template, composed builds are re-rendered deterministically
+- [x] Fragment format: each domain template is itself a validated `RuleSet` fragment with its own namespaced section range (`§WASM-1..`, `§TAURI-1..`), merged without id collisions
 - [ ] Domain templates shipped in-repo: `wasm`, `tauri`, `bevy`, `embedded-no-std`, `axum`, `cli`, `library` (the README already promises Tauri/Bevy/Embedded/WASM)
 - [ ] `cargo agentforge --template wasm,tauri` selects fragments; default = core only
-- [ ] Merge validation: no rule-id collision across fragments, no orphan overrides, section ordering stable and deterministic
-- [ ] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
+- [x] Merge validation: no rule-id collision across fragments, no orphan overrides, section ordering stable and deterministic; fragments may target core rules with overrides (validated against the composed set)
+- [x] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
 - [ ] Unit tests: each promised domain template compiles, merges cleanly, round-trips through the manifest
 
 ## Phase 5: Data / Rules Pipeline & Distribution (open)

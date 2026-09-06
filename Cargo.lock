@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "agentforge-builder"
+version = "0.1.0"
+dependencies = [
+ "agentforge-domain",
+ "thiserror",
+]
+
+[[package]]
 name = "agentforge-core"
 version = "0.1.0"
 dependencies = [
