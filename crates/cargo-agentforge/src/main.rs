@@ -40,6 +40,8 @@ enum Command {
   Validate(OutputArgs),
   /// Show a rule-level diff between the installed and target rulesets.
   Diff(OutputArgs),
+  /// Run the validation pipeline on the bundled ruleset (the release gate).
+  Verify(VerifyArgs),
 }
 
 #[derive(Args, Default)]
@@ -63,6 +65,17 @@ struct OutputArgs {
   json: bool,
 }
 
+/// Flags for `verify` (the build validation pipeline).
+#[derive(Args, Default)]
+struct VerifyArgs {
+  /// Comma-separated domain templates to verify, e.g. `--template wasm,tauri`.
+  #[arg(long, value_name = "TEMPLATES")]
+  template: Option<String>,
+  /// Emit machine-readable JSON on stdout.
+  #[arg(long)]
+  json: bool,
+}
+
 fn main() {
   let cli = Cli::parse();
 
@@ -76,6 +89,7 @@ fn main() {
     Command::Templates => run_templates(),
     Command::Validate(args) => run_validate(&args),
     Command::Diff(args) => run_diff(&args),
+    Command::Verify(args) => run_verify(&args),
   };
 
   std::process::exit(exit.as_i32());
@@ -239,6 +253,75 @@ fn run_diff(args: &OutputArgs) -> ExitCode {
   }
 }
 
+/// Run the validation pipeline on the bundled ruleset. Non-zero exit when
+/// the build reports errors — the release gate.
+fn run_verify(args: &VerifyArgs) -> ExitCode {
+  let fragments = match resolve_selection(args.template.as_deref()) {
+    Ok(f) => f,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::InputError;
+    }
+  };
+
+  let report = agentforge_builder::validation_report(&agentforge_builder::BuildConfig {
+    core_template: CORE_TEMPLATE,
+    fragments: &fragments,
+    version: RULESET_VERSION,
+    generated_at: &resolve_generated_at(),
+  });
+
+  if args.json {
+    print_json(&report);
+  } else {
+    println!(
+      "rules: {}, fragments: {}",
+      report.rule_count, report.fragment_count
+    );
+    for warning in &report.warnings {
+      eprintln!("⚠ {warning}");
+    }
+    for error in &report.errors {
+      eprintln!("✗ {error}");
+    }
+    if report.errors.is_empty() {
+      println!("✓ ruleset is valid and shippable.");
+    } else {
+      eprintln!(
+        "✗ ruleset has {} error(s) and must not be shipped.",
+        report.errors.len()
+      );
+    }
+  }
+
+  if report.errors.is_empty() {
+    ExitCode::Installed
+  } else {
+    ExitCode::InputError
+  }
+}
+
+/// Resolve the manifest `generated_at` timestamp: use `SOURCE_DATE_EPOCH`
+/// when the build system pins one (reproducible builds), otherwise the
+/// fixed default constant.
+fn resolve_generated_at() -> String {
+  generated_at_from_env(std::env::var("SOURCE_DATE_EPOCH").ok().as_deref())
+}
+
+/// Pure helper so the timestamp logic is testable without touching the
+/// process environment.
+fn generated_at_from_env(raw: Option<&str>) -> String {
+  match raw {
+    Some(v) => v
+      .trim()
+      .parse::<i64>()
+      .ok()
+      .map(agentforge_builder::generated_at_from_epoch)
+      .unwrap_or_else(|| GENERATED_AT.to_string()),
+    None => GENERATED_AT.to_string(),
+  }
+}
+
 /// Resolve a comma-separated `--template` selection into builder fragments.
 fn resolve_selection(selection: Option<&str>) -> Result<Vec<(&'static str, &'static str)>, String> {
   match selection {
@@ -258,7 +341,7 @@ fn compose(
     core_template: CORE_TEMPLATE,
     fragments,
     version: RULESET_VERSION,
-    generated_at: GENERATED_AT,
+    generated_at: &resolve_generated_at(),
   })
   .map_err(|e| format!("failed to compose ruleset: {e}"))
 }
@@ -481,5 +564,36 @@ mod tests {
     let report = validate_agents_md(CORE_TEMPLATE);
     assert_eq!(report.issue_count, 0);
     assert_eq!(report.rule_count, 27);
+  }
+
+  #[test]
+  fn bundled_ruleset_passes_validation_pipeline() {
+    let report = agentforge_builder::validation_report(&agentforge_builder::BuildConfig {
+      core_template: CORE_TEMPLATE,
+      fragments: &[],
+      version: RULESET_VERSION,
+      generated_at: GENERATED_AT,
+    });
+    assert!(report.errors.is_empty());
+    assert_eq!(report.rule_count, 27);
+    assert_eq!(report.fragment_count, 0);
+  }
+
+  #[test]
+  fn source_date_epoch_overrides_timestamp() {
+    assert_eq!(
+      generated_at_from_env(Some("1700000000")),
+      "2023-11-14T22:13:20Z"
+    );
+    assert_eq!(generated_at_from_env(None), GENERATED_AT);
+  }
+
+  #[test]
+  fn invalid_source_date_epoch_falls_back() {
+    assert_eq!(generated_at_from_env(Some("not-a-number")), GENERATED_AT);
+    assert_eq!(
+      generated_at_from_env(Some("  1700000000  ")),
+      "2023-11-14T22:13:20Z"
+    );
   }
 }

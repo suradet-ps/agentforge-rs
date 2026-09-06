@@ -84,7 +84,7 @@ equally. The constitution becomes a **core + pluggable domain layer**.
 - [x] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
 - [x] Unit tests: each promised domain template compiles, merges cleanly, round-trips through the manifest (`every_shipped_template_merges_cleanly`, `every_shipped_template_round_trips_through_manifest`)
 
-## Phase 5: Data / Rules Pipeline & Distribution (open)
+## Phase 5: Data / Rules Pipeline & Distribution (offline half done)
 
 The README's "update the rules" story today is `cargo install --force`. That
 pulls the whole CLI binary just to refresh a text file. We separate **rule
@@ -93,9 +93,9 @@ distribution** from **CLI distribution**.
 - [ ] `cargo agentforge update-rules` fetches the latest ruleset manifest + markdown from a pinned, TLS-validated URL (GitHub Releases asset), never disabling cert validation
 - [ ] Ruleset published as a standalone release asset (`agentforge-rules-<version>.tar.zst`) separate from the binary, so updating rules does not require reinstalling the CLI
 - [ ] Reproducible build: same input manifest → byte-identical `AGENTS-RUST.md` output (deterministic section ordering, no timestamps in output unless `--emit-metadata`)
-- [ ] `SOURCE_DATE_EPOCH` support for reproducible builds
-- [ ] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest
-- [ ] `validation-report.json` output (`errors`, `warnings`, `rule_count`, `fragment_count`)
+- [x] `SOURCE_DATE_EPOCH` support for reproducible builds (`generated_at_from_epoch` — hand-rolled civil-from-days, no `chrono` dep)
+- [x] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest (`validation_report` in `agentforge-builder`)
+- [x] `validation-report.json` output (`errors`, `warnings`, `rule_count`, `fragment_count`); warns when an override weakens a `Mandatory` rule; surfaced as `cargo agentforge verify [--template …] [--json]`
 - [ ] Unit + integration tests against a fixture ruleset; the live-network fetch is `#[ignore]`d like MenSung's real-API tests
 
 ## Phase 6: CLI Surface (`cargo-agentforge`) (open)

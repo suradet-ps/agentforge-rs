@@ -2,18 +2,22 @@
 //! validated, deterministic `AGENTS-RUST.md` and its manifest.
 
 mod golden;
+mod metadata;
 mod render;
 pub mod templates;
+mod validation;
 
 use agentforge_domain::error::DomainError;
 use agentforge_domain::manifest::RuleManifest;
 use agentforge_domain::rule::RuleSet;
 
 pub use golden::{GoldenRule, check_golden_rules};
+pub use metadata::generated_at_from_epoch;
 pub use render::render_agents_md;
 pub use templates::{
   CORE_TEMPLATE, GENERATED_AT, RULESET_VERSION, TEMPLATES, get_template, resolve_selection,
 };
+pub use validation::{BuildValidationReport, validation_report};
 
 /// Errors surfaced while building a composed ruleset.
 #[derive(Debug, thiserror::Error)]
