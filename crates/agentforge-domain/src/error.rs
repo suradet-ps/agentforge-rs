@@ -8,6 +8,9 @@ pub enum DomainError {
   #[error("duplicate rule id: {0}")]
   DuplicateRuleId(String),
 
+  #[error("duplicate section id: {0}")]
+  DuplicateSection(String),
+
   #[error("override targets nonexistent rule: {0}")]
   OverrideTargetNotFound(String),
 

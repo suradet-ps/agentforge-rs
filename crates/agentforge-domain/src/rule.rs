@@ -104,6 +104,16 @@ impl Rule {
   }
 }
 
+/// A section heading (`## N. Title`), carrying the title that prose rules
+/// do not. Needed to render a `RuleSet` back to faithful markdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Section {
+  /// Section id (e.g. `5` or `WASM-1`).
+  pub id: crate::rule_id::RuleId,
+  /// Human-readable section title.
+  pub title: String,
+}
+
 /// A complete set of rules parsed from `AGENTS-RUST.md`.
 #[derive(Debug, Clone)]
 pub struct RuleSet {
@@ -113,6 +123,8 @@ pub struct RuleSet {
   pub rules: Vec<Rule>,
   /// Overrides applied on top of the base rules.
   pub overrides: Vec<crate::r#override::Override>,
+  /// Ordered section headings seen while parsing.
+  pub sections: Vec<Section>,
 }
 
 impl RuleSet {
@@ -122,7 +134,24 @@ impl RuleSet {
       version,
       rules: Vec::new(),
       overrides: Vec::new(),
+      sections: Vec::new(),
     }
+  }
+
+  /// Add a section heading. Returns an error on duplicate section ID.
+  pub fn add_section(&mut self, section: Section) -> Result<(), crate::error::DomainError> {
+    if self.sections.iter().any(|s| s.id == section.id) {
+      return Err(crate::error::DomainError::DuplicateSection(
+        section.id.to_string(),
+      ));
+    }
+    self.sections.push(section);
+    Ok(())
+  }
+
+  /// Look up a section heading by ID.
+  pub fn get_section(&self, id: &crate::rule_id::RuleId) -> Option<&Section> {
+    self.sections.iter().find(|s| &s.id == id)
   }
 
   /// Add a rule. Returns an error on duplicate ID.

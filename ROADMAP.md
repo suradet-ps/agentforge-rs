@@ -34,11 +34,11 @@ and diff rules we need a structured, typed model of what a rule actually is.
 This is the phase that makes everything downstream possible.
 
 - [x] New crate `agentforge-domain` with zero `std::unwrap()` outside tests
-- [x] `RuleId` newtype (e.g. `RuleId("5.2")`), never a bare `String` key floating through the code; validated against `[0-9.]` pattern, numeric ordering (`5` < `5.2` < `14`)
+- [x] `RuleId` newtype (e.g. `RuleId("5.2")`), never a bare `String` key floating through the code; validated against `[0-9.]` pattern, numeric ordering (`5` < `5.2` < `14`); extended to namespaced ids (`WASM-1`, `WASM-1.2`) for domain fragments, numeric core ids sort before namespaced ids
 - [x] `Rule` entity: id, section, title, body, severity (`Mandatory` / `Recommended` / `Advisory`), machine-readable tag set (`tokio`, `unsafe`, `testing`, …); case-insensitive tag lookup
 - [x] `Override` entity: a `[OVERRIDE §X]` parsed into target rule id + replacement / exemption, with validation that the target id actually exists in the baseline; `parse_line()` handles the bracket/section format
-- [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides, with `add_rule()` / `add_override()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
-- [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
+- [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides + recorded section headings (`Section { id, title }`), with `add_rule()` / `add_override()` / `add_section()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
+- [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N` or `## WASM-1`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
 - [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule body checksums (FNV-1a placeholder for SHA-256), JSON serializable
 - [x] Domain error types with `thiserror`; typed errors for `InvalidRuleId`, `DuplicateRuleId`, `OverrideTargetNotFound`, `DuplicateOverride`, `EmptyRuleSet`, `MissingField`, `ManifestVersionMismatch`
 - [x] Unit tests: 30 tests covering rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering, override parsing (valid/invalid/edge cases), manifest generation, serialization round-trip

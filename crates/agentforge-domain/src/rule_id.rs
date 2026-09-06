@@ -4,11 +4,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::DomainError;
 
-/// A validated rule identifier like `"5.2"` or `"14"`.
+/// A validated rule identifier like `"5.2"`, `"14"`, or `"WASM-1.2"`.
 ///
-/// Rule IDs follow the pattern `<major>` or `<major>.<minor>` where major
-/// is a section number and minor is an optional sub-section number. The ID
-/// is always stored as a trimmed, non-empty string.
+/// Two shapes are accepted:
+///
+/// - Numeric: `<major>` or `<major>.<minor>` (e.g. `5`, `5.2`, `14`).
+/// - Namespaced: `<NS>-<n>` or `<NS>-<n>.<m>` where `<NS>` is an all-alpha
+///   domain tag (e.g. `WASM-1`, `WASM-1.2`). Used by domain template
+///   fragments so they own a distinct id space that cannot collide with the
+///   numeric core constitution.
+///
+/// Ordering is stable: numeric ids sort before namespaced ids, and within a
+/// namespace ids sort numerically (`WASM-1.2` < `WASM-1.10`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RuleId(String);
 
@@ -20,12 +27,29 @@ impl PartialOrd for RuleId {
 
 impl Ord for RuleId {
   fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    let parse = |s: &str| -> Vec<u32> {
-      s.split('.')
+    self.key().cmp(&other.key())
+  }
+}
+
+impl RuleId {
+  /// Return a sortable key: `(namespace, numeric-parts)`.
+  ///
+  /// Numeric ids have an empty namespace; namespaced ids carry their tag.
+  fn key(&self) -> (String, Vec<u32>) {
+    if let Some((ns, rest)) = self.0.split_once('-') {
+      let nums = rest
+        .split('.')
         .map(|p| p.parse::<u32>().unwrap_or(0))
-        .collect()
-    };
-    parse(&self.0).cmp(&parse(&other.0))
+        .collect();
+      (ns.to_string(), nums)
+    } else {
+      let nums = self
+        .0
+        .split('.')
+        .map(|p| p.parse::<u32>().unwrap_or(0))
+        .collect();
+      (String::new(), nums)
+    }
   }
 }
 
@@ -45,10 +69,12 @@ impl<'de> Deserialize<'de> for RuleId {
 impl RuleId {
   /// Parse and validate a rule ID string.
   ///
+  /// Accepts numeric ids (`5`, `5.2`) and namespaced ids (`WASM-1`,
+  /// `WASM-1.2`).
+  ///
   /// # Errors
   ///
-  /// Returns `DomainError::InvalidRuleId` if the input is empty, contains
-  /// only whitespace, or has characters outside `[0-9.]`.
+  /// Returns `DomainError::InvalidRuleId` for malformed input.
   pub fn new(raw: &str) -> Result<Self, DomainError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -56,17 +82,47 @@ impl RuleId {
         "empty or whitespace-only".into(),
       ));
     }
-    if !trimmed.chars().all(|c| c.is_ascii_digit() || c == '.') {
+    if !trimmed
+      .chars()
+      .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+    {
       return Err(DomainError::InvalidRuleId(format!(
         "contains invalid characters: {trimmed}"
       )));
     }
-    // Reject trailing/leading dots and consecutive dots
     if trimmed.starts_with('.') || trimmed.ends_with('.') || trimmed.contains("..") {
       return Err(DomainError::InvalidRuleId(format!(
         "malformed dot pattern: {trimmed}"
       )));
     }
+    if trimmed.starts_with('-')
+      || trimmed.ends_with('-')
+      || trimmed.contains("--")
+      || trimmed.contains(".-")
+      || trimmed.contains("-.")
+    {
+      return Err(DomainError::InvalidRuleId(format!(
+        "malformed dash pattern: {trimmed}"
+      )));
+    }
+
+    if let Some((ns, rest)) = trimmed.split_once('-') {
+      if ns.is_empty() || !ns.chars().all(|c| c.is_ascii_alphabetic()) {
+        return Err(DomainError::InvalidRuleId(format!(
+          "namespace must be all letters: {trimmed}"
+        )));
+      }
+      if rest.is_empty() || !rest.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Err(DomainError::InvalidRuleId(format!(
+          "namespaced id must be `<NS>-<digits>`: {trimmed}"
+        )));
+      }
+    } else if !trimmed.chars().all(|c| c.is_ascii_digit() || c == '.') {
+      return Err(DomainError::InvalidRuleId(format!(
+        "numeric id must contain only digits and dots: {trimmed}"
+      )));
+    }
+
     Ok(RuleId(trimmed.to_owned()))
   }
 
@@ -143,6 +199,41 @@ mod tests {
     let c = RuleId::new("14").unwrap();
     assert!(a < b);
     assert!(b < c);
+  }
+
+  #[test]
+  fn valid_namespaced_ids() {
+    assert_eq!(RuleId::new("WASM-1").unwrap().as_str(), "WASM-1");
+    assert_eq!(RuleId::new("WASM-1.2").unwrap().as_str(), "WASM-1.2");
+    assert_eq!(RuleId::new("wasm-3").unwrap().as_str(), "wasm-3");
+  }
+
+  #[test]
+  fn invalid_namespaced_ids() {
+    assert!(RuleId::new("WASM-").is_err()); // empty number
+    assert!(RuleId::new("-1").is_err()); // empty namespace
+    assert!(RuleId::new("WASM1-2").is_err()); // digit in namespace
+    assert!(RuleId::new("WASM-1-2").is_err()); // two dashes
+    assert!(RuleId::new("WASM--1").is_err()); // consecutive dashes
+    assert!(RuleId::new("WASM-.1").is_err()); // dash before dot
+    assert!(RuleId::new("WASM-1.").is_err()); // trailing dot
+  }
+
+  #[test]
+  fn namespaced_ordering() {
+    assert!(RuleId::new("WASM-1").unwrap() < RuleId::new("WASM-2").unwrap());
+    assert!(RuleId::new("WASM-1.2").unwrap() < RuleId::new("WASM-1.10").unwrap());
+    assert!(RuleId::new("WASM-9").unwrap() < RuleId::new("WASM-10").unwrap());
+    // numeric core ids sort before namespaced ids
+    assert!(RuleId::new("14").unwrap() < RuleId::new("WASM-1").unwrap());
+    // namespaces order lexicographically
+    assert!(RuleId::new("TAURI-1").unwrap() < RuleId::new("WASM-1").unwrap());
+  }
+
+  #[test]
+  fn numeric_ids_still_reject_letters_and_dashes() {
+    assert!(RuleId::new("5a").is_err());
+    assert!(RuleId::new("5-2").is_err());
   }
 
   #[test]
