@@ -21,12 +21,13 @@ a formal `[OVERRIDE §X]` system so real projects bend the rules without
 breaking them. One command. Zero configuration. The rules arrive as a
 typed, versioned, verifiable artifact - not a blob of prose.
 
-| P0 ▣ | P1 ▣ | P2 ▣ | P3 ▣ | P4-P11 ☐ |
-|---|---|---|---|---|
+| P0-P4 ▣ | P5 ☐ | P6 ◐ | P7-P11 ☐ |
+|---|---|---|---|
 
-*Foundation, the typed rule model, the manifest format, and the
-conflict-safe installer are sealed. The template engine, update pipeline,
-full CLI surface, and the v1.0 gate stand open.*
+*Foundation, the typed rule model, the manifest format, the conflict-safe
+installer, and the template engine (7 domain fragments) are sealed. The
+rules update pipeline, the remaining CLI surface, the TUI, and the v1.0
+gate stand open.*
 
 > Built with pure Rust. The install path never touches the network -
 > the constitution is embedded at compile time.
@@ -42,14 +43,21 @@ Install once, forge everywhere.
 ```
 ⟫ cargo install --git https://github.com/suradet-ps/agentforge-rs cargo-agentforge
 ⟫ cd your-rust-project
-⟫ cargo agentforge init       # install or upgrade the constitution
-⟫ cargo agentforge check      # up to date? exits non-zero when stale
+⟫ cargo agentforge init                      # install or upgrade the constitution
+⟫ cargo agentforge init --template wasm,tauri  # compose domain fragments into it
+⟫ cargo agentforge templates                 # list the available fragments
+⟫ cargo agentforge check                     # up to date? exits non-zero when stale
 ⟫ cargo agentforge version
 ```
 
 `AGENTS-RUST.md` is now in your project root. Your AI agent reads it,
 and follows it. `init` is the default subcommand, so bare
-`⟫ cargo agentforge` behaves the same.
+`⟫ cargo agentforge` behaves the same (core constitution only, written
+verbatim).
+
+Domain fragments (`wasm`, `tauri`, `bevy`, `embedded`, `axum`, `cli`,
+`library`) extend the constitution with typed, namespaced rules that merge
+cleanly into the core — no network, everything embedded at compile time.
 
 Update the rules: `⟫ cargo install --git ... --force` to pull the latest
 baseline; `⟫ cargo agentforge init --force` to overwrite a locally edited
@@ -76,28 +84,36 @@ installs and upgrades.
 
 ## ◆ ANATOMY
 
-Three crates, one contract: the rules are a typed model, not prose.
+Four crates, one contract: the rules are a typed model, not prose.
 
 - **Models** - `agentforge-domain` turns the constitution into typed
-  entities: `RuleId` (validated, orderable), `Rule` with severity and
+  entities: `RuleId` (validated, orderable — numeric for the core,
+  namespaced like `WASM-1` for fragments), `Rule` with severity and
   machine-readable tags, `Override` with target validation, the
   `RuleSet` that rejects duplicate ids and orphan overrides, and a
   code-fence-aware markdown parser that maps `AGENTS-RUST.md` into that
-  model without ever panicking. 43 tests hold the model together.
+  model without ever panicking. 51 tests hold the model together.
 - **Manifests** - every rule carries a body checksum in a versioned
   `.agentforge.json` companion, so tooling knows "what version of the
   rules is installed" without parsing prose - and can tell a pristine
   baseline from a locally edited rule.
 - **Installs** - `agentforge-core` runs the flow: detect, parse, compare
-  manifest, then `install` / `skip` / `upgrade` / `conflict`. Local edits
-  are never overwritten silently - the diff is reported, `--force` is
-  required, `--dry-run` touches nothing. Filesystem access stays behind a
-  trait so the whole flow is unit-tested against an in-memory tree.
+  manifest, then `install` / `skip` / `upgrade` / `conflict`, plus
+  `check` (non-zero when stale). Local edits are never overwritten
+  silently - the diff is reported, `--force` is required, `--dry-run`
+  touches nothing. Filesystem access stays behind a trait so the whole
+  flow is unit-tested against an in-memory tree.
+- **Builds** - `agentforge-builder` composes the core constitution with
+  zero or more domain fragments (`wasm`, `tauri`, `bevy`, `embedded`,
+  `axum`, `cli`, `library`), embedded at compile time, merged with
+  collision/orphan-override validation and rendered deterministically.
+  Every shipped template must merge and round-trip through the manifest
+  before it ships.
 - **Ships** - the `cargo-agentforge` binary is the cargo subcommand
-  itself: `init` / `check` / `version` over a dependency-light CLI, the
-  pure-logic core kept dependency-free behind a filesystem trait,
-  cross-platform release builds, checksums on every release, offline by
-  construction.
+  itself: `init [--template ...]` / `check` / `version` / `templates`
+  over a dependency-light CLI, the pure-logic core kept dependency-free
+  behind a filesystem trait, cross-platform release builds, checksums on
+  every release, offline by construction.
 
 ---
 
@@ -128,10 +144,9 @@ the template is embedded at compile time, no network, no phone-home.
 **Where this artifact is heading**
 
 ```
-P0-P3 ▸ foundation, rule model, manifest, installer ────────────── ▸ sealed
-P4    ▸ template engine: wasm, tauri, bevy, embedded, axum ──────── ▸ open
+P0-P4 ▸ foundation, model, manifest, installer, template engine ─── ▸ sealed
 P5    ▸ rules pipeline: pinned TLS-fetched updates, reproducible ▸ ▸ ▸ open
-P6    ▸ CLI surface: init/check/version ▸ sealed; diff/validate ▸ open
+P6    ▸ CLI surface: init/check/version/templates ▸ sealed; diff/validate ▸ open
 P7    ▸ TUI installer (ratatui), stretch ─────────────────────────── ▸ open
 P8-P10 ▸ golden-rule suite, perf budgets, security hardening ─────── ▸ open
 P11   ▸ v1.0.0: crates.io publish, docs book, release gate ──────── ▸ open

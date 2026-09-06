@@ -34,11 +34,11 @@ and diff rules we need a structured, typed model of what a rule actually is.
 This is the phase that makes everything downstream possible.
 
 - [x] New crate `agentforge-domain` with zero `std::unwrap()` outside tests
-- [x] `RuleId` newtype (e.g. `RuleId("5.2")`), never a bare `String` key floating through the code; validated against `[0-9.]` pattern, numeric ordering (`5` < `5.2` < `14`)
+- [x] `RuleId` newtype (e.g. `RuleId("5.2")`), never a bare `String` key floating through the code; validated against `[0-9.]` pattern, numeric ordering (`5` < `5.2` < `14`); extended to namespaced ids (`WASM-1`, `WASM-1.2`) for domain fragments, numeric core ids sort before namespaced ids
 - [x] `Rule` entity: id, section, title, body, severity (`Mandatory` / `Recommended` / `Advisory`), machine-readable tag set (`tokio`, `unsafe`, `testing`, …); case-insensitive tag lookup
 - [x] `Override` entity: a `[OVERRIDE §X]` parsed into target rule id + replacement / exemption, with validation that the target id actually exists in the baseline; `parse_line()` handles the bracket/section format
-- [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides, with `add_rule()` / `add_override()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
-- [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
+- [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides + recorded section headings (`Section { id, title }`), with `add_rule()` / `add_override()` / `add_section()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
+- [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N` or `## WASM-1`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
 - [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule body checksums (FNV-1a placeholder for SHA-256), JSON serializable
 - [x] Domain error types with `thiserror`; typed errors for `InvalidRuleId`, `DuplicateRuleId`, `OverrideTargetNotFound`, `DuplicateOverride`, `EmptyRuleSet`, `MissingField`, `ManifestVersionMismatch`
 - [x] Unit tests: 30 tests covering rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering, override parsing (valid/invalid/edge cases), manifest generation, serialization round-trip
@@ -70,18 +70,18 @@ idempotent, auditable installer built on the domain model.
 - [x] Exit codes distinguishing: `installed`, `upgraded`, `skipped`, `conflict-needs-confirmation`, `input-error`, `internal-error`
 - [x] Unit tests: install-when-missing, skip-when-pristine, conflict-when-edited, force-overwrite, dry-run-touches-nothing, version-mismatch, corrupt-manifest
 
-## Phase 4: Template Engine & Domain Templates (`agentforge-builder`) (open)
+## Phase 4: Template Engine & Domain Templates (`agentforge-builder`) (done)
 
 One monolithic `AGENTS-RUST.md` cannot serve WASM, kernel, and web
 equally. The constitution becomes a **core + pluggable domain layer**.
 
-- [ ] Crate `agentforge-builder`: composes the core constitution with zero or more domain template fragments into the final `AGENTS-RUST.md`
-- [ ] Fragment format: each domain template is itself a validated `RuleSet` fragment with its own section range (e.g. `§WASM-1..`), merged without id collisions
-- [ ] Domain templates shipped in-repo: `wasm`, `tauri`, `bevy`, `embedded-no-std`, `axum`, `cli`, `library` (the README already promises Tauri/Bevy/Embedded/WASM)
-- [ ] `cargo agentforge --template wasm,tauri` selects fragments; default = core only
-- [ ] Merge validation: no rule-id collision across fragments, no orphan overrides, section ordering stable and deterministic
-- [ ] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
-- [ ] Unit tests: each promised domain template compiles, merges cleanly, round-trips through the manifest
+- [x] Crate `agentforge-builder`: composes the core constitution with zero or more domain template fragments into the final `AGENTS-RUST.md`; core-only builds return the verbatim template, composed builds are re-rendered deterministically
+- [x] Fragment format: each domain template is itself a validated `RuleSet` fragment with its own namespaced section range (`§WASM-1..`, `§TAURI-1..`), merged without id collisions
+- [x] Domain templates shipped in-repo: `wasm`, `tauri`, `bevy`, `embedded-no-std`, `axum`, `cli`, `library` (the README already promises Tauri/Bevy/Embedded/WASM); each embedded at compile time in `agentforge-builder` alongside the core constitution
+- [x] `cargo agentforge init --template wasm,tauri` selects fragments; default = core only (bare `init` keeps writing the verbatim core template; unknown templates error with `ExitCode::InputError`)
+- [x] Merge validation: no rule-id collision across fragments, no orphan overrides, section ordering stable and deterministic; fragments may target core rules with overrides (validated against the composed set)
+- [x] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
+- [x] Unit tests: each promised domain template compiles, merges cleanly, round-trips through the manifest (`every_shipped_template_merges_cleanly`, `every_shipped_template_round_trips_through_manifest`)
 
 ## Phase 5: Data / Rules Pipeline & Distribution (open)
 
@@ -107,7 +107,7 @@ Expand the single install command into a coherent, scriptable CLI.
 - [ ] `cargo agentforge diff` — show a unified diff between installed and target ruleset, honoring local edits
 - [ ] `cargo agentforge validate` — parse the project's `AGENTS-RUST.md`, report malformed overrides or stale rule ids
 - [x] `cargo agentforge version` — prints CLI version, never touches network or filesystem
-- [ ] `cargo agentforge templates` — lists available domain templates and their descriptions
+- [x] `cargo agentforge templates` — lists available domain templates and their descriptions
 - [ ] Plain-text and `--json` output for `check`/`validate`/`diff` so CI can consume them
 - [ ] All network-touching commands gated on explicit user confirmation; no silent phone-home
 

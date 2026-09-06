@@ -8,6 +8,7 @@ license.workspace = true
 description = "Installs AGENTS-RUST.md into Rust projects"
 
 [dependencies]
+agentforge-builder = { path = "../agentforge-builder" }
 agentforge-domain = { path = "../agentforge-domain" }
 agentforge-core = { path = "../agentforge-core" }
 clap = { version = "4", features = ["derive"] }

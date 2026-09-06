@@ -3,6 +3,15 @@
 version = 4
 
 [[package]]
+name = "agentforge-builder"
+version = "0.1.0"
+dependencies = [
+ "agentforge-domain",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "agentforge-core"
 version = "0.1.0"
 dependencies = [
@@ -74,6 +83,7 @@ dependencies = [
 name = "cargo-agentforge"
 version = "0.1.0"
 dependencies = [
+ "agentforge-builder",
  "agentforge-core",
  "agentforge-domain",
  "clap",
