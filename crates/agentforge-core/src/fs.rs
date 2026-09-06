@@ -51,9 +51,12 @@ impl InstallTarget for RealFs {
 }
 
 /// In-memory filesystem for testing.
+///
+/// Unlike the real filesystem, writes are captured so tests can assert on
+/// exactly what the install flow persisted.
 #[cfg(test)]
 pub struct MockFs {
-  files: std::collections::HashMap<std::path::PathBuf, String>,
+  files: std::cell::RefCell<std::collections::HashMap<std::path::PathBuf, String>>,
   label: String,
 }
 
@@ -61,23 +64,14 @@ pub struct MockFs {
 impl MockFs {
   pub fn new() -> Self {
     Self {
-      files: std::collections::HashMap::new(),
+      files: std::cell::RefCell::new(std::collections::HashMap::new()),
       label: "mock filesystem".into(),
     }
   }
 
-  pub fn with_file(
-    mut self,
-    path: impl Into<std::path::PathBuf>,
-    contents: impl Into<String>,
-  ) -> Self {
-    self.files.insert(path.into(), contents.into());
+  pub fn with_file(self, path: impl Into<std::path::PathBuf>, contents: impl Into<String>) -> Self {
+    self.files.borrow_mut().insert(path.into(), contents.into());
     self
-  }
-
-  #[allow(dead_code)]
-  pub fn files(&self) -> &std::collections::HashMap<std::path::PathBuf, String> {
-    &self.files
   }
 }
 
@@ -91,19 +85,19 @@ impl Default for MockFs {
 #[cfg(test)]
 impl InstallTarget for MockFs {
   fn read_file(&self, path: &Path) -> Option<String> {
-    self.files.get(path).cloned()
+    self.files.borrow().get(path).cloned()
   }
 
   fn write_file(&self, path: &Path, contents: &str) -> Result<(), String> {
-    // MockFs is not interior-mutability, so this won't actually persist.
-    // Tests that need write verification should use a different approach.
-    // For install tests we mostly care about reads and decisions.
-    let _ = (path, contents);
+    self
+      .files
+      .borrow_mut()
+      .insert(path.to_path_buf(), contents.to_string());
     Ok(())
   }
 
   fn file_exists(&self, path: &Path) -> bool {
-    self.files.contains_key(path)
+    self.files.borrow().contains_key(path)
   }
 
   fn label(&self) -> &str {

@@ -91,6 +91,19 @@ impl RuleManifest {
       overrides,
     })
   }
+
+  /// Whether two manifests describe the same effective rule set.
+  ///
+  /// Compares the ruleset version, rules, and overrides while ignoring
+  /// bookkeeping fields (`generated_at`, `manifest_version`, `rule_count`)
+  /// that differ between regenerations of the same ruleset. Used to detect
+  /// "already installed, nothing to do" without tripping on a fresh
+  /// timestamp.
+  pub fn content_eq(&self, other: &Self) -> bool {
+    self.ruleset_version == other.ruleset_version
+      && self.rules == other.rules
+      && self.overrides == other.overrides
+  }
 }
 
 /// Minimal SHA-256 hex digest (no external crate dependency).
