@@ -49,6 +49,7 @@ Install once, forge everywhere.
 ⟫ cargo agentforge check                     # up to date? exits non-zero when stale
 ⟫ cargo agentforge validate                  # every issue in the installed file, with line numbers
 ⟫ cargo agentforge diff                      # rule-level diff vs the target (honors local edits)
+⟫ cargo agentforge verify [--template …]     # validation pipeline: is this ruleset shippable?
 ⟫ cargo agentforge version
 ```
 
@@ -61,10 +62,11 @@ Domain fragments (`wasm`, `tauri`, `bevy`, `embedded`, `axum`, `cli`,
 `library`) extend the constitution with typed, namespaced rules that merge
 cleanly into the core — no network, everything embedded at compile time.
 
-`check`, `validate`, and `diff` also accept `--json` for CI consumption;
-every command exits `0` on success and a documented non-zero code when
-something needs attention (conflict `3`, stale `4`, not-installed `5`,
-diff `6`, input error `2`).
+`check`, `validate`, `diff`, and `verify` also accept `--json` for CI
+consumption; every command exits `0` on success and a documented non-zero
+code when something needs attention (conflict `3`, stale `4`, not-installed
+`5`, diff `6`, input error `2`). Reproducible builds are pinned via
+`SOURCE_DATE_EPOCH`, which fixes the manifest timestamp.
 
 Update the rules: `⟫ cargo install --git ... --force` to pull the latest
 baseline; `⟫ cargo agentforge init --force` to overwrite a locally edited
@@ -119,8 +121,11 @@ Four crates, one contract: the rules are a typed model, not prose.
 - **Guards** - a golden-rule gate (`tests/golden_rules.json` +
   `check_golden_rules`) fails the build if the shipped ruleset ever drops
   or weakens a mandatory rule (e.g. §3 `clippy -D warnings`, §5.4
-  `// SAFETY:`), backed by seeded property tests and a cargo-fuzz target
-  asserting the parser never panics.
+  `// SAFETY:`), backed by seeded property tests, a cargo-fuzz target
+  asserting the parser never panics, and a validation pipeline
+  (`verify`) that refuses to ship a ruleset with build errors.
+  `SOURCE_DATE_EPOCH` pins manifests for byte-identical reproducible
+  builds.
 - **Ships** - the `cargo-agentforge` binary is the cargo subcommand
   itself: `init [--template ...]` / `check` / `version` / `templates` /
   `validate` / `diff` over a dependency-light CLI, the pure-logic core
@@ -157,7 +162,7 @@ the template is embedded at compile time, no network, no phone-home.
 
 ```
 P0-P4 ▸ foundation, model, manifest, installer, template engine ─── ▸ sealed
-P5    ▸ rules pipeline: pinned TLS-fetched updates, reproducible ▸ ▸ ▸ open
+P5    ▸ rules pipeline: reproducible builds + validation gate ▸ sealed; network updates ▸ open
 P6    ▸ CLI surface: init/check/version/templates/validate/diff ▸ sealed
 P7    ▸ TUI installer (ratatui), stretch ─────────────────────────── ▸ open
 P8    ▸ golden-rule gate, property tests, fuzz target ────────────── ▸ sealed

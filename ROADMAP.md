@@ -84,7 +84,7 @@ equally. The constitution becomes a **core + pluggable domain layer**.
 - [x] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
 - [x] Unit tests: each promised domain template compiles, merges cleanly, round-trips through the manifest (`every_shipped_template_merges_cleanly`, `every_shipped_template_round_trips_through_manifest`)
 
-## Phase 5: Data / Rules Pipeline & Distribution (open)
+## Phase 5: Data / Rules Pipeline & Distribution (offline half done)
 
 The README's "update the rules" story today is `cargo install --force`. That
 pulls the whole CLI binary just to refresh a text file. We separate **rule
