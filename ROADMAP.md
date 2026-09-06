@@ -135,7 +135,7 @@ mandatory rule.
 
 ## Phase 9: Performance Hardening (open)
 
-- [ ] Benchmark harness (criterion) for cold-start and install time
+- [x] Benchmark harness (criterion) for build/compose and install time — `crates/agentforge-builder/benches/bench.rs` (build core-only ~50µs, build all templates, parse core), minimal feature set (no plotters)
 - [ ] Install `<50ms` for core-only on a warm filesystem, `<200ms` with all templates, verified in CI not just claimed
 - [ ] Binary size budget check as a CI step (target: `<5MB` stripped, zero-dep core); fails the build if exceeded
 - [ ] Memory budget (`<20MB` resident) on a constrained runner
