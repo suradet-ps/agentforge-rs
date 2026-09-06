@@ -136,10 +136,10 @@ mandatory rule.
 ## Phase 9: Performance Hardening (open)
 
 - [x] Benchmark harness (criterion) for build/compose and install time — `crates/agentforge-builder/benches/bench.rs` (build core-only ~50µs, build all templates, parse core), minimal feature set (no plotters)
-- [ ] Install `<50ms` for core-only on a warm filesystem, `<200ms` with all templates, verified in CI not just claimed
-- [ ] Binary size budget check as a CI step (target: `<5MB` stripped, zero-dep core); fails the build if exceeded
-- [ ] Memory budget (`<20MB` resident) on a constrained runner
-- [ ] Startup `<100ms` measured from `cargo agentforge version` (the no-op path)
+- [x] Install `<50ms` for core-only on a warm filesystem, `<200ms` with all templates, verified in CI (`scripts/perf-check.sh`, `.github/workflows/perf.yml`) — measured ~3ms locally, budgets are generous for slow runners
+- [x] Binary size budget check as a CI step (target: `<5MB` stripped, zero-dep core); fails the build if exceeded — currently ~1MB stripped
+- [x] Memory budget (`<20MB` resident) on a constrained runner — measured ~1MB for `version`
+- [x] Startup `<100ms` measured from `cargo agentforge version` (the no-op path) — measured ~3ms
 
 ## Phase 10: Security Hardening (open)
 
