@@ -8,6 +8,9 @@ pub mod rule_id;
 pub use error::DomainError;
 pub use manifest::RuleManifest;
 pub use r#override::Override;
-pub use parser::{parse_agents_md, parse_agents_md_fragment};
+pub use parser::{
+  ValidationIssue, ValidationIssueKind, ValidationReport, parse_agents_md,
+  parse_agents_md_fragment, validate_agents_md,
+};
 pub use rule::{Rule, RuleSet, Severity};
 pub use rule_id::RuleId;

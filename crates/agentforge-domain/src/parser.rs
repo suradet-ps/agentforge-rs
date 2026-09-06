@@ -4,7 +4,10 @@
 //! feature (versioning, diffing, safe updates, validation) needs a typed
 //! model. This module turns the human-readable document into the domain
 //! model without ever panicking: every malformed input produces a typed
-//! [`DomainError`].
+//! [`DomainError`]. The same scan powers `validate_agents_md`, which reports
+//! *every* problem with line numbers instead of stopping at the first.
+
+use serde::Serialize;
 
 use crate::error::DomainError;
 use crate::r#override::Override;
@@ -36,7 +39,11 @@ use crate::rule_id::RuleId;
 /// for invalid override directives, [`DomainError::EmptyRuleSet`] when no
 /// rules are present, and [`DomainError::Parse`] for structural problems.
 pub fn parse_agents_md(source: &str, version: &str) -> Result<RuleSet, DomainError> {
-  Parser::new(version).parse(source, true)
+  let (collected, issues) = collect(source, true);
+  if let Some(issue) = issues.into_iter().next() {
+    return Err(issue.err);
+  }
+  build_ruleset(version, &collected, true)
 }
 
 /// Parse a domain fragment where `[OVERRIDE §X]` targets may reference rules
@@ -44,7 +51,85 @@ pub fn parse_agents_md(source: &str, version: &str) -> Result<RuleSet, DomainErr
 /// alone. Override targets are therefore **not** validated here; the caller
 /// (the builder) validates them after merging.
 pub fn parse_agents_md_fragment(source: &str, version: &str) -> Result<RuleSet, DomainError> {
-  Parser::new(version).parse(source, false)
+  let (collected, issues) = collect(source, false);
+  if let Some(issue) = issues.into_iter().next() {
+    return Err(issue.err);
+  }
+  build_ruleset(version, &collected, false)
+}
+
+/// A problem found while validating an `AGENTS-RUST.md` document.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ValidationIssue {
+  /// 1-based line number in the source document.
+  pub line: usize,
+  /// Category of the problem.
+  pub kind: ValidationIssueKind,
+  /// Human-readable description.
+  pub message: String,
+}
+
+/// Category of a validation issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum ValidationIssueKind {
+  /// No rules were found at all.
+  EmptyRuleSet,
+  /// A section or rule heading is malformed.
+  MalformedHeading,
+  /// The same rule id appears twice.
+  DuplicateRuleId,
+  /// The same section id appears twice.
+  DuplicateSection,
+  /// Two overrides target the same rule.
+  DuplicateOverride,
+  /// An override line does not match `[OVERRIDE §X] reason`.
+  MalformedOverride,
+  /// An override targets a rule id that does not exist in the document.
+  OrphanOverride,
+}
+
+/// The result of validating an `AGENTS-RUST.md` document. Unlike parsing,
+/// validation reports every issue it finds instead of stopping at the first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ValidationReport {
+  /// Number of rules successfully recognized.
+  pub rule_count: usize,
+  /// Total number of issues found.
+  pub issue_count: usize,
+  /// All issues, in line order.
+  pub issues: Vec<ValidationIssue>,
+}
+
+/// Validate an `AGENTS-RUST.md` document, collecting every issue with its
+/// line number. Never fails: a document with no rules is reported as an
+/// [`ValidationIssueKind::EmptyRuleSet`] issue, not an error.
+pub fn validate_agents_md(source: &str) -> ValidationReport {
+  let (collected, raw) = collect(source, true);
+  let issues: Vec<ValidationIssue> = raw
+    .into_iter()
+    .map(|r| ValidationIssue {
+      line: r.line,
+      kind: r.kind,
+      message: r.err.to_string(),
+    })
+    .collect();
+  ValidationReport {
+    rule_count: collected.rules.len(),
+    issue_count: issues.len(),
+    issues,
+  }
+}
+
+struct RawIssue {
+  line: usize,
+  kind: ValidationIssueKind,
+  err: DomainError,
+}
+
+struct Collected {
+  rules: Vec<(Rule, usize)>,
+  sections: Vec<(Section, usize)>,
+  overrides: Vec<(Override, usize)>,
 }
 
 struct Pending {
@@ -52,145 +137,221 @@ struct Pending {
   section: String,
   title: String,
   body: Vec<String>,
+  line: usize,
 }
 
-struct Parser<'a> {
-  version: &'a str,
-  rules: Vec<Rule>,
-  overrides: Vec<Override>,
-  sections: Vec<Section>,
-  pending: Option<Pending>,
-  current_section: Option<String>,
-  in_code_fence: bool,
+/// Scan a document into collected items plus every issue encountered.
+/// Never fails; problems become [`RawIssue`]s.
+fn collect(source: &str, validate_overrides: bool) -> (Collected, Vec<RawIssue>) {
+  let mut rules: Vec<(Rule, usize)> = Vec::new();
+  let mut sections: Vec<(Section, usize)> = Vec::new();
+  let mut overrides: Vec<(Override, usize)> = Vec::new();
+  let mut issues: Vec<RawIssue> = Vec::new();
+
+  let mut pending: Option<Pending> = None;
+  let mut current_section: Option<String> = None;
+  let mut in_code_fence = false;
+
+  for (idx, line) in source.lines().enumerate() {
+    let lineno = idx + 1;
+    let trimmed = line.trim();
+
+    if trimmed.starts_with("```") {
+      in_code_fence = !in_code_fence;
+      if let Some(p) = &mut pending {
+        p.body.push(line.to_string());
+      }
+      continue;
+    }
+
+    if in_code_fence {
+      if let Some(p) = &mut pending {
+        p.body.push(line.to_string());
+      }
+      continue;
+    }
+
+    if trimmed == "---" {
+      continue;
+    }
+
+    if trimmed.starts_with("## ") {
+      flush_pending(&mut pending, &mut rules, &mut issues);
+      match parse_section_heading(trimmed) {
+        Err(err) => issues.push(RawIssue {
+          line: lineno,
+          kind: ValidationIssueKind::MalformedHeading,
+          err,
+        }),
+        Ok((id, title)) => {
+          let id_str = id.as_str().to_string();
+          if sections.iter().any(|(s, _)| s.id == id) {
+            issues.push(RawIssue {
+              line: lineno,
+              kind: ValidationIssueKind::DuplicateSection,
+              err: DomainError::DuplicateSection(id_str.clone()),
+            });
+          } else {
+            sections.push((
+              Section {
+                id: id.clone(),
+                title: title.clone(),
+              },
+              lineno,
+            ));
+          }
+          current_section = Some(id_str.clone());
+          pending = Some(Pending {
+            id,
+            section: id_str,
+            title,
+            body: Vec::new(),
+            line: lineno,
+          });
+        }
+      }
+      continue;
+    }
+
+    if trimmed.starts_with("### ") {
+      flush_pending(&mut pending, &mut rules, &mut issues);
+      match parse_rule_heading(trimmed) {
+        Err(err) => issues.push(RawIssue {
+          line: lineno,
+          kind: ValidationIssueKind::MalformedHeading,
+          err,
+        }),
+        Ok((id, title)) => {
+          let section = current_section.clone().unwrap_or_else(|| {
+            id.as_str()
+              .split('.')
+              .next()
+              .unwrap_or_default()
+              .to_string()
+          });
+          pending = Some(Pending {
+            id,
+            section,
+            title,
+            body: Vec::new(),
+            line: lineno,
+          });
+        }
+      }
+      continue;
+    }
+
+    if trimmed.starts_with("[OVERRIDE") {
+      match Override::parse_line(trimmed) {
+        Err(err) => issues.push(RawIssue {
+          line: lineno,
+          kind: ValidationIssueKind::MalformedOverride,
+          err,
+        }),
+        Ok(ovr) => {
+          if overrides
+            .iter()
+            .any(|(o, _)| o.target_rule_id == ovr.target_rule_id)
+          {
+            issues.push(RawIssue {
+              line: lineno,
+              kind: ValidationIssueKind::DuplicateOverride,
+              err: DomainError::DuplicateOverride(ovr.target_rule_id.to_string()),
+            });
+          } else {
+            overrides.push((ovr, lineno));
+          }
+        }
+      }
+      continue;
+    }
+
+    if let Some(p) = &mut pending {
+      p.body.push(line.to_string());
+    }
+  }
+
+  flush_pending(&mut pending, &mut rules, &mut issues);
+
+  if rules.is_empty() {
+    issues.push(RawIssue {
+      line: 1,
+      kind: ValidationIssueKind::EmptyRuleSet,
+      err: DomainError::EmptyRuleSet,
+    });
+  }
+
+  if validate_overrides {
+    for (ovr, line) in &overrides {
+      if !rules.iter().any(|(r, _)| r.id == ovr.target_rule_id) {
+        issues.push(RawIssue {
+          line: *line,
+          kind: ValidationIssueKind::OrphanOverride,
+          err: DomainError::OverrideTargetNotFound(ovr.target_rule_id.to_string()),
+        });
+      }
+    }
+  }
+
+  (
+    Collected {
+      rules,
+      sections,
+      overrides,
+    },
+    issues,
+  )
+}
+
+/// Finalize the current pending rule into the rules list, detecting
+/// duplicate rule ids. Emits a [`RawIssue`] for duplicates instead of
+/// failing.
+fn flush_pending(
+  pending: &mut Option<Pending>,
+  rules: &mut Vec<(Rule, usize)>,
+  issues: &mut Vec<RawIssue>,
+) {
+  let Some(p) = pending.take() else {
+    return;
+  };
+  let body = clean_body(&p.body);
+  if body.is_empty() {
+    return;
+  }
+  if rules.iter().any(|(r, _)| r.id == p.id) {
+    issues.push(RawIssue {
+      line: p.line,
+      kind: ValidationIssueKind::DuplicateRuleId,
+      err: DomainError::DuplicateRuleId(p.id.to_string()),
+    });
+    return;
+  }
+  rules.push((
+    Rule::new(p.id, p.section, p.title, body, Severity::Mandatory),
+    p.line,
+  ));
+}
+
+fn build_ruleset(
+  version: &str,
+  collected: &Collected,
   validate_overrides: bool,
-}
-
-impl<'a> Parser<'a> {
-  fn new(version: &'a str) -> Self {
-    Self {
-      version,
-      rules: Vec::new(),
-      overrides: Vec::new(),
-      sections: Vec::new(),
-      pending: None,
-      current_section: None,
-      in_code_fence: false,
-      validate_overrides: true,
+) -> Result<RuleSet, DomainError> {
+  let mut rs = RuleSet::new(version.to_string());
+  for (section, _) in &collected.sections {
+    rs.add_section(section.clone())?;
+  }
+  for (rule, _) in &collected.rules {
+    rs.add_rule(rule.clone())?;
+  }
+  for (ovr, _) in &collected.overrides {
+    if validate_overrides {
+      rs.add_override(ovr.clone())?;
+    } else {
+      rs.overrides.push(ovr.clone());
     }
   }
-
-  fn parse(mut self, source: &str, validate_overrides: bool) -> Result<RuleSet, DomainError> {
-    self.validate_overrides = validate_overrides;
-    for line in source.lines() {
-      let trimmed = line.trim();
-
-      if trimmed.starts_with("```") {
-        self.in_code_fence = !self.in_code_fence;
-        if let Some(pending) = &mut self.pending {
-          pending.body.push(line.to_string());
-        }
-        continue;
-      }
-
-      if self.in_code_fence {
-        if let Some(pending) = &mut self.pending {
-          pending.body.push(line.to_string());
-        }
-        continue;
-      }
-
-      if trimmed == "---" {
-        continue;
-      }
-
-      if trimmed.starts_with("## ") {
-        self.flush_pending()?;
-        let (id, title) = parse_section_heading(trimmed)?;
-        let id_str = id.as_str().to_string();
-        self.sections.push(Section {
-          id: id.clone(),
-          title: title.clone(),
-        });
-        self.current_section = Some(id_str.clone());
-        self.pending = Some(Pending {
-          id,
-          section: id_str,
-          title,
-          body: Vec::new(),
-        });
-        continue;
-      }
-
-      if trimmed.starts_with("### ") {
-        self.flush_pending()?;
-        let (id, title) = parse_rule_heading(trimmed)?;
-        let section = self.current_section.clone().unwrap_or_else(|| {
-          id.as_str()
-            .split('.')
-            .next()
-            .unwrap_or_default()
-            .to_string()
-        });
-        self.pending = Some(Pending {
-          id,
-          section,
-          title,
-          body: Vec::new(),
-        });
-        continue;
-      }
-
-      if trimmed.starts_with("[OVERRIDE") {
-        let ovr = Override::parse_line(trimmed)?;
-        self.overrides.push(ovr);
-        continue;
-      }
-
-      if let Some(pending) = &mut self.pending {
-        pending.body.push(line.to_string());
-      }
-    }
-
-    self.flush_pending()?;
-
-    if self.rules.is_empty() {
-      return Err(DomainError::EmptyRuleSet);
-    }
-
-    let mut rs = RuleSet::new(self.version.to_string());
-    for section in self.sections {
-      rs.add_section(section)?;
-    }
-    for rule in self.rules {
-      rs.add_rule(rule)?;
-    }
-    for ovr in self.overrides {
-      if self.validate_overrides {
-        rs.add_override(ovr)?;
-      } else {
-        rs.overrides.push(ovr);
-      }
-    }
-    Ok(rs)
-  }
-
-  fn flush_pending(&mut self) -> Result<(), DomainError> {
-    let Some(pending) = self.pending.take() else {
-      return Ok(());
-    };
-    let body = clean_body(&pending.body);
-    if body.is_empty() {
-      return Ok(());
-    }
-    self.rules.push(Rule::new(
-      pending.id,
-      pending.section,
-      pending.title,
-      body,
-      Severity::Mandatory,
-    ));
-    Ok(())
-  }
+  Ok(rs)
 }
 
 /// Split a section heading `## <id>. <Title>` into `(id, title)`.
@@ -441,5 +602,77 @@ Intro text that must be ignored.
     let rs = parse_agents_md(src, "0.1.0").unwrap();
     assert_eq!(rs.overrides.len(), 1);
     assert_eq!(rs.overrides[0].target_rule_id.as_str(), "WASM-1.1");
+  }
+
+  #[test]
+  fn validate_collects_every_issue_with_line_numbers() {
+    let src = "\
+## 1. A
+
+- body
+
+### 1.1 Dup
+
+- a
+
+### 1.1 Dup
+
+- b
+
+[OVERRIDE §9.9] Orphan target.
+
+[OVERRIDE §1.1] Fine.
+
+[OVERRIDE §1.1] Duplicate target.
+
+## 2. B
+
+- c
+";
+    let report = validate_agents_md(src);
+    assert_eq!(report.rule_count, 3);
+    let kinds: Vec<ValidationIssueKind> = report.issues.iter().map(|i| i.kind).collect();
+    assert!(kinds.contains(&ValidationIssueKind::DuplicateRuleId));
+    assert!(kinds.contains(&ValidationIssueKind::OrphanOverride));
+    assert!(kinds.contains(&ValidationIssueKind::DuplicateOverride));
+    for issue in &report.issues {
+      assert!(issue.line >= 1);
+      assert!(!issue.message.is_empty());
+    }
+  }
+
+  #[test]
+  fn validate_clean_document_has_no_issues() {
+    let report = validate_agents_md(SAMPLE);
+    assert_eq!(report.issue_count, 0);
+    assert_eq!(report.rule_count, 4);
+  }
+
+  #[test]
+  fn validate_empty_document_reports_empty_ruleset() {
+    let report = validate_agents_md("");
+    assert_eq!(report.rule_count, 0);
+    assert_eq!(report.issues.len(), 1);
+    assert_eq!(report.issues[0].kind, ValidationIssueKind::EmptyRuleSet);
+  }
+
+  #[test]
+  fn validate_reports_malformed_override_line() {
+    let src = "## 1. A\n\n- body\n\n[OVERRIDE §] broken\n";
+    let report = validate_agents_md(src);
+    assert!(
+      report
+        .issues
+        .iter()
+        .any(|i| i.kind == ValidationIssueKind::MalformedOverride)
+    );
+  }
+
+  #[test]
+  fn validation_report_serializes() {
+    let report = validate_agents_md("### 1.1 A\n\n- body\n");
+    let json = serde_json::to_string(&report).unwrap();
+    assert!(json.contains("\"rule_count\""));
+    assert!(json.contains("\"issues\""));
   }
 }
