@@ -127,11 +127,11 @@ The equivalent of MenSung's medical safety gate: we must never ship a
 ruleset that is internally inconsistent or that silently weakens a
 mandatory rule.
 
-- [ ] `tests/golden_rules.json`: fixed known cases — e.g. "§5 mandates `clippy -D warnings`" must survive a build; "an override targeting a nonexistent rule is rejected"; "two fragments must not collide on a rule id"
-- [ ] CI gate: `crates/agentforge-builder/tests/golden_rules.rs` runs under `cargo test --workspace`; a ruleset that drops or weakens a golden rule fails it
+- [x] `tests/golden_rules.json`: fixed known cases — e.g. "§5 mandates `clippy -D warnings`" must survive a build; "an override targeting a nonexistent rule is rejected"; "two fragments must not collide on a rule id"
+- [x] CI gate: `crates/agentforge-builder/tests/golden_rules.rs` runs under `cargo test --workspace`; a ruleset that drops or weakens a golden rule fails it (`check_golden_rules` in `agentforge-builder`)
 - [ ] `cargo-fuzz` target for the markdown→RuleSet parser (every malformed input must error, never panic)
 - [ ] Property-based tests for override resolution (every override resolves to an existing rule; applying then reverting is a no-op on pristine input)
-- [ ] "Zero silent downgrade" test: building ruleset B from A where B removes a `Mandatory` rule without an explicit override is rejected
+- [x] "Zero silent downgrade" test: removing or weakening a `Mandatory` golden rule (e.g. §3, §5.2) is detected by the gate
 
 ## Phase 9: Performance Hardening (open)
 
