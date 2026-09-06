@@ -88,6 +88,8 @@ dependencies = [
  "agentforge-core",
  "agentforge-domain",
  "clap",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
