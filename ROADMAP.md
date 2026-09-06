@@ -93,7 +93,7 @@ distribution** from **CLI distribution**.
 - [ ] `cargo agentforge update-rules` fetches the latest ruleset manifest + markdown from a pinned, TLS-validated URL (GitHub Releases asset), never disabling cert validation
 - [ ] Ruleset published as a standalone release asset (`agentforge-rules-<version>.tar.zst`) separate from the binary, so updating rules does not require reinstalling the CLI
 - [ ] Reproducible build: same input manifest → byte-identical `AGENTS-RUST.md` output (deterministic section ordering, no timestamps in output unless `--emit-metadata`)
-- [ ] `SOURCE_DATE_EPOCH` support for reproducible builds
+- [x] `SOURCE_DATE_EPOCH` support for reproducible builds (`generated_at_from_epoch` — hand-rolled civil-from-days, no `chrono` dep)
 - [ ] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest
 - [ ] `validation-report.json` output (`errors`, `warnings`, `rule_count`, `fragment_count`)
 - [ ] Unit + integration tests against a fixture ruleset; the live-network fetch is `#[ignore]`d like MenSung's real-API tests
