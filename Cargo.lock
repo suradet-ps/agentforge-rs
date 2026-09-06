@@ -7,6 +7,7 @@ name = "agentforge-builder"
 version = "0.1.0"
 dependencies = [
  "agentforge-domain",
+ "serde",
  "serde_json",
  "thiserror",
 ]

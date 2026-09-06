@@ -63,7 +63,7 @@ impl std::str::FromStr for Severity {
 }
 
 /// A single rule within the constitution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rule {
   /// Identifier like `"5.2"`.
   pub id: crate::rule_id::RuleId,

@@ -1,6 +1,7 @@
 //! Composes the core constitution with domain template fragments into a
 //! validated, deterministic `AGENTS-RUST.md` and its manifest.
 
+mod golden;
 mod render;
 pub mod templates;
 
@@ -8,6 +9,7 @@ use agentforge_domain::error::DomainError;
 use agentforge_domain::manifest::RuleManifest;
 use agentforge_domain::rule::RuleSet;
 
+pub use golden::{GoldenRule, check_golden_rules};
 pub use render::render_agents_md;
 pub use templates::{
   CORE_TEMPLATE, GENERATED_AT, RULESET_VERSION, TEMPLATES, get_template, resolve_selection,

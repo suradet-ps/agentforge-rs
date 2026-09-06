@@ -1,0 +1,24 @@
+[package]
+name = "agentforge-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+agentforge-domain = { path = "../crates/agentforge-domain" }
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false
+
+# Detach from the root workspace: this crate only builds under
+# `cargo +nightly fuzz run parse` and is intentionally absent from the
+# `members` list so normal builds and CI never compile it.
+[workspace]

@@ -1,0 +1,9 @@
+[
+  { "id": "0", "requires": ["Read before writing"] },
+  { "id": "3", "requires": ["cargo clippy", "-D warnings", "cargo test"] },
+  { "id": "5.2", "requires": ["thiserror"] },
+  { "id": "5.4", "requires": ["// SAFETY:"] },
+  { "id": "5.5", "requires": ["panic"] },
+  { "id": "10", "requires": ["secrets"] },
+  { "id": "13", "requires": ["unwrap"] }
+]

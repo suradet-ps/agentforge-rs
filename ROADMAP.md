@@ -121,17 +121,17 @@ Expand the single install command into a coherent, scriptable CLI.
 - [ ] Keyboard-only navigation (no mouse required)
 - [ ] Verified interactively in a real terminal (tmux), with a regression test for "cancel clears selection, does not write"
 
-## Phase 8: Safety / Golden Rule Suite (open)
+## Phase 8: Safety / Golden Rule Suite (done)
 
 The equivalent of MenSung's medical safety gate: we must never ship a
 ruleset that is internally inconsistent or that silently weakens a
 mandatory rule.
 
-- [ ] `tests/golden_rules.json`: fixed known cases — e.g. "§5 mandates `clippy -D warnings`" must survive a build; "an override targeting a nonexistent rule is rejected"; "two fragments must not collide on a rule id"
-- [ ] CI gate: `crates/agentforge-builder/tests/golden_rules.rs` runs under `cargo test --workspace`; a ruleset that drops or weakens a golden rule fails it
-- [ ] `cargo-fuzz` target for the markdown→RuleSet parser (every malformed input must error, never panic)
-- [ ] Property-based tests for override resolution (every override resolves to an existing rule; applying then reverting is a no-op on pristine input)
-- [ ] "Zero silent downgrade" test: building ruleset B from A where B removes a `Mandatory` rule without an explicit override is rejected
+- [x] `tests/golden_rules.json`: fixed known cases — e.g. "§5 mandates `clippy -D warnings`" must survive a build; "an override targeting a nonexistent rule is rejected"; "two fragments must not collide on a rule id"
+- [x] CI gate: `crates/agentforge-builder/tests/golden_rules.rs` runs under `cargo test --workspace`; a ruleset that drops or weakens a golden rule fails it (`check_golden_rules` in `agentforge-builder`)
+- [x] `cargo-fuzz` target for the markdown→RuleSet parser (`fuzz/`, runs via `cargo +nightly fuzz run parse`, deliberately outside the workspace so stable builds/CI never compile it; every malformed input must error, never panic)
+- [x] Property-based tests for override resolution (deterministic seeded-PRNG sweeps: every override resolves to an existing rule, orphans are rejected, applying then reverting is a no-op on pristine rules; parse→render→parse round-trip is stable and rendering is idempotent across 500 generated documents; the parser never panics on 3000 random malformed inputs)
+- [x] "Zero silent downgrade" test: removing or weakening a `Mandatory` golden rule (e.g. §3, §5.2) is detected by the gate
 
 ## Phase 9: Performance Hardening (open)
 
