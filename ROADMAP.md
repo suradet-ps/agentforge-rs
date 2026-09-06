@@ -101,12 +101,12 @@ distribution** from **CLI distribution**.
 
 Expand the single install command into a coherent, scriptable CLI.
 
-- [ ] `cargo agentforge init [--template ...] [--force] [--dry-run]` — install/upgrade
-- [ ] `cargo agentforge check` — report installed ruleset version vs bundled/latest, non-zero on stale
+- [x] `cargo agentforge init [--force] [--dry-run]` — install/upgrade, wired to `agentforge-core` (default subcommand; `--template` lands with Phase 4)
+- [x] `cargo agentforge check` — report installed ruleset version vs bundled baseline, non-zero on stale (`ExitCode::Stale`/`NotInstalled`); "vs latest" (network) lands with Phase 5
 - [ ] `cargo agentforge update-rules [--yes]` — explicit, confirmed network fetch; never automatic
 - [ ] `cargo agentforge diff` — show a unified diff between installed and target ruleset, honoring local edits
 - [ ] `cargo agentforge validate` — parse the project's `AGENTS-RUST.md`, report malformed overrides or stale rule ids
-- [ ] `cargo agentforge version` — prints CLI version, never touches network or filesystem
+- [x] `cargo agentforge version` — prints CLI version, never touches network or filesystem
 - [ ] `cargo agentforge templates` — lists available domain templates and their descriptions
 - [ ] Plain-text and `--json` output for `check`/`validate`/`diff` so CI can consume them
 - [ ] All network-touching commands gated on explicit user confirmation; no silent phone-home
