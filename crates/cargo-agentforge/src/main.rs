@@ -77,7 +77,10 @@ struct VerifyArgs {
 }
 
 fn main() {
-  let cli = Cli::parse();
+  // Cargo invokes external subcommands as `cargo agentforge <args>`, passing
+  // the subcommand name itself as the first argument. Strip it so the same
+  // CLI parses both through cargo and when invoked directly.
+  let cli = parse_cli(std::env::args_os().collect());
 
   let exit = match cli.command.unwrap_or(Command::Init(InitArgs::default())) {
     Command::Init(args) => run_init(&args),
@@ -93,6 +96,25 @@ fn main() {
   };
 
   std::process::exit(exit.as_i32());
+}
+
+/// Parse the CLI, tolerating the `agentforge` argument that cargo prepends
+/// when it runs an external subcommand (`cargo agentforge init` ->
+/// `cargo-agentforge agentforge init`).
+fn parse_cli(args: Vec<std::ffi::OsString>) -> Cli {
+  Cli::parse_from(strip_cargo_subcommand_name(args))
+}
+
+/// Remove the leading `agentforge` argument when present. Direct
+/// invocations (`cargo-agentforge init`) are left untouched.
+fn strip_cargo_subcommand_name(args: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
+  if args.get(1).is_some_and(|a| a == "agentforge") {
+    let mut args = args;
+    args.remove(1);
+    args
+  } else {
+    args
+  }
 }
 
 fn run_init(args: &InitArgs) -> ExitCode {
@@ -595,5 +617,55 @@ mod tests {
       generated_at_from_env(Some("  1700000000  ")),
       "2023-11-14T22:13:20Z"
     );
+  }
+
+  #[test]
+  fn strip_cargo_subcommand_name_removes_cargo_prefix() {
+    use std::ffi::OsString;
+    let via_cargo = strip_cargo_subcommand_name(
+      ["cargo-agentforge", "agentforge", "init"]
+        .into_iter()
+        .map(OsString::from)
+        .collect(),
+    );
+    assert_eq!(via_cargo, ["cargo-agentforge", "init"].map(OsString::from));
+  }
+
+  #[test]
+  fn strip_cargo_subcommand_name_keeps_direct_invocation() {
+    use std::ffi::OsString;
+    let direct = strip_cargo_subcommand_name(
+      ["cargo-agentforge", "init"]
+        .into_iter()
+        .map(OsString::from)
+        .collect(),
+    );
+    assert_eq!(direct, ["cargo-agentforge", "init"].map(OsString::from));
+  }
+
+  #[test]
+  fn parses_cargo_invocation_with_subcommand_name() {
+    let cli = parse_cli(
+      ["cargo-agentforge", "agentforge", "version"]
+        .map(std::ffi::OsString::from)
+        .to_vec(),
+    );
+    assert!(matches!(cli.command, Some(Command::Version)));
+  }
+
+  #[test]
+  fn parses_direct_invocation_without_subcommand_name() {
+    let cli = parse_cli(
+      ["cargo-agentforge", "version"]
+        .map(std::ffi::OsString::from)
+        .to_vec(),
+    );
+    assert!(matches!(cli.command, Some(Command::Version)));
+  }
+
+  #[test]
+  fn parses_no_arguments_as_default_init() {
+    let cli = parse_cli(["cargo-agentforge"].map(std::ffi::OsString::from).to_vec());
+    assert!(cli.command.is_none());
   }
 }
