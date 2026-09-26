@@ -1,16 +1,24 @@
-//! `cargo agentforge` — install, check, validate, and diff the
+//! `cargo agentforge`: install, check, validate, diff, and update the
 //! `AGENTS-RUST.md` constitution for Rust projects.
 //!
 //! The binary follows the `cargo` subcommand convention: it is invoked as
 //! `cargo agentforge <subcommand>`. With no subcommand it defaults to `init`.
 
+mod bundle;
+mod remote;
+
+use std::io::{IsTerminal, Write as _};
 use std::path::PathBuf;
 
 use agentforge_builder::{CORE_TEMPLATE, GENERATED_AT, RULESET_VERSION};
-use agentforge_core::{Config, CoreError, ExitCode, RealFs, check_status, diff_manifests, install};
+use agentforge_core::{
+  Checksum, Config, CoreError, ExitCode, Fetcher, Outcome, RealFs, check_status, diff_manifests,
+  install, update,
+};
 use agentforge_domain::{RuleManifest, parse_agents_md, validate_agents_md};
 
 use clap::{Args, Parser, Subcommand};
+use remote::UreqFetcher;
 
 const AGENTS_FILE: &str = "AGENTS-RUST.md";
 const MANIFEST_FILE: &str = ".agentforge.json";
@@ -42,6 +50,10 @@ enum Command {
   Diff(OutputArgs),
   /// Run the validation pipeline on the bundled ruleset (the release gate).
   Verify(VerifyArgs),
+  /// Download, verify, and apply a newer ruleset bundle over the installed one.
+  UpdateRules(UpdateRulesArgs),
+  /// Write the embedded ruleset as a release bundle (used by the release workflow).
+  Bundle(BundleArgs),
 }
 
 #[derive(Args, Default)]
@@ -76,6 +88,37 @@ struct VerifyArgs {
   json: bool,
 }
 
+/// Flags for `update-rules`.
+#[derive(Args)]
+struct UpdateRulesArgs {
+  /// URL of the ruleset bundle to download.
+  #[arg(long, value_name = "URL")]
+  url: String,
+  /// Expected SHA-256 of the bundle; defaults to SHA256SUMS.txt next to it.
+  #[arg(long, value_name = "SHA256")]
+  sha256: Option<String>,
+  /// Skip the interactive confirmation prompt (required when not a terminal).
+  #[arg(long)]
+  yes: bool,
+  /// Overwrite locally-edited rules instead of reporting a conflict.
+  #[arg(long)]
+  force: bool,
+  /// Report what would change without fetching or writing anything.
+  #[arg(long)]
+  dry_run: bool,
+  /// Emit machine-readable JSON on stdout.
+  #[arg(long)]
+  json: bool,
+}
+
+/// Flags for `bundle`.
+#[derive(Args)]
+struct BundleArgs {
+  /// File to write the bundle to.
+  #[arg(long, value_name = "PATH")]
+  output: PathBuf,
+}
+
 fn main() {
   // Cargo invokes external subcommands as `cargo agentforge <args>`, passing
   // the subcommand name itself as the first argument. Strip it so the same
@@ -93,6 +136,8 @@ fn main() {
     Command::Validate(args) => run_validate(&args),
     Command::Diff(args) => run_diff(&args),
     Command::Verify(args) => run_verify(&args),
+    Command::UpdateRules(args) => run_update_rules(&args),
+    Command::Bundle(args) => run_bundle(&args),
   };
 
   std::process::exit(exit.as_i32());
@@ -323,6 +368,232 @@ fn run_verify(args: &VerifyArgs) -> ExitCode {
   }
 }
 
+/// Download, verify, and apply a ruleset bundle. The network is touched only
+/// after explicit confirmation (or an explicit `--yes`); `--dry-run` still
+/// fetches and verifies but never writes.
+fn run_update_rules(args: &UpdateRulesArgs) -> ExitCode {
+  let Some(installed_md) = std::fs::read_to_string(AGENTS_FILE).ok() else {
+    eprintln!("✗ {AGENTS_FILE} not found. Run `cargo agentforge init` first.");
+    return ExitCode::NotInstalled;
+  };
+  let Some(installed_json) = std::fs::read_to_string(MANIFEST_FILE).ok() else {
+    eprintln!("✗ {MANIFEST_FILE} not found. Run `cargo agentforge init` first.");
+    return ExitCode::NotInstalled;
+  };
+  let installed: RuleManifest = match serde_json::from_str(&installed_json) {
+    Ok(manifest) => manifest,
+    Err(e) => {
+      eprintln!("✗ failed to parse {MANIFEST_FILE}: {e}");
+      return ExitCode::InputError;
+    }
+  };
+  let installed_rs = match parse_agents_md(&installed_md, &installed.ruleset_version) {
+    Ok(ruleset) => ruleset,
+    Err(e) => {
+      eprintln!("✗ failed to parse {AGENTS_FILE}: {e}");
+      return ExitCode::InputError;
+    }
+  };
+  let selection = detect_template_names(&installed_rs);
+
+  if !args.yes && !args.dry_run {
+    if !std::io::stdin().is_terminal() {
+      eprintln!("✗ refusing to prompt in a non-interactive session; pass --yes");
+      return ExitCode::InputError;
+    }
+    if !prompt_update(&args.url, args.sha256.as_deref()) {
+      println!("aborted; nothing written.");
+      return ExitCode::Skipped;
+    }
+  }
+
+  let fetcher = UreqFetcher::new();
+  let filename = match remote::asset_filename(&args.url) {
+    Ok(name) => name,
+    Err(e) => {
+      eprintln!("✗ {e}");
+      return ExitCode::InputError;
+    }
+  };
+
+  let bundle_bytes = match fetcher.fetch(&args.url) {
+    Ok(bytes) => bytes,
+    Err(e) => {
+      eprintln!("✗ {e}");
+      return ExitCode::InputError;
+    }
+  };
+
+  let expected =
+    match resolve_expected_checksum(&fetcher, args.sha256.as_deref(), &args.url, &filename) {
+      Ok(checksum) => checksum,
+      Err(e) => {
+        eprintln!("✗ {e}");
+        return ExitCode::InputError;
+      }
+    };
+  if let Err(e) = expected.verify(&filename, &bundle_bytes) {
+    eprintln!("✗ {e}");
+    return ExitCode::InputError;
+  }
+
+  let bundle = match bundle::decode_bundle(&bundle_bytes) {
+    Ok(bundle) => bundle,
+    Err(e) => {
+      eprintln!("✗ {e}");
+      return ExitCode::InputError;
+    }
+  };
+  if let Err(e) = bundle::verify_bundle(&bundle) {
+    eprintln!("✗ {e}");
+    return ExitCode::InputError;
+  }
+  let target = match bundle::compose_target(&bundle, &selection) {
+    Ok(target) => target,
+    Err(e) => {
+      eprintln!("✗ {e}");
+      return ExitCode::InputError;
+    }
+  };
+
+  if !args.json {
+    println!("✓ {filename} sha256 verified");
+    if selection.is_empty() {
+      println!("  selection: core only");
+    } else {
+      println!("  selection: {}", selection.join(", "));
+    }
+    println!(
+      "  ruleset: {} -> {}",
+      installed.ruleset_version, bundle.ruleset_version
+    );
+  }
+
+  let config = Config {
+    manifest: target.manifest,
+    agents_md: target.markdown,
+    agents_md_path: PathBuf::from(AGENTS_FILE),
+    manifest_path: PathBuf::from(MANIFEST_FILE),
+    force: args.force,
+    dry_run: args.dry_run,
+  };
+
+  let outcome = match update(&RealFs, &config) {
+    Ok(outcome) => outcome,
+    Err(e) => return print_error_and_exit(e),
+  };
+
+  if args.json {
+    let edited = match &outcome {
+      Outcome::Conflict { edited_rules } => edited_rules.as_slice(),
+      _ => &[],
+    };
+    print_json(&UpdateReport {
+      from: &installed.ruleset_version,
+      to: &config.manifest.ruleset_version,
+      templates: &selection,
+      url: &args.url,
+      status: outcome_status(&outcome),
+      edited_rules: edited,
+    });
+  } else {
+    print_outcome(&outcome, &config);
+  }
+
+  outcome.exit_code()
+}
+
+/// Ask before the first network request. The URL and expected checksum are
+/// printed so the user confirms exactly what will be downloaded.
+fn prompt_update(url: &str, sha256: Option<&str>) -> bool {
+  println!("About to download the ruleset bundle:");
+  println!("  url: {url}");
+  match sha256 {
+    Some(hex) => println!("  expected sha256: {hex}"),
+    None => println!("  expected sha256: from SHA256SUMS.txt next to the bundle"),
+  }
+  print!("Proceed? [y/N] ");
+  let _ = std::io::stdout().flush();
+
+  let mut answer = String::new();
+  if std::io::stdin().read_line(&mut answer).is_err() {
+    return false;
+  }
+  matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+}
+
+/// Resolve the expected digest of the bundle: an explicit `--sha256`, or the
+/// entry for the asset in the neighboring `SHA256SUMS.txt`.
+fn resolve_expected_checksum(
+  fetcher: &impl Fetcher,
+  sha256: Option<&str>,
+  url: &str,
+  filename: &str,
+) -> Result<Checksum, String> {
+  if let Some(hex) = sha256 {
+    return Checksum::parse(hex).map_err(|e| e.to_string());
+  }
+
+  let sums_url = remote::sums_url_for(url).map_err(|e| e.to_string())?;
+  let bytes = fetcher.fetch(&sums_url)?;
+  let text =
+    String::from_utf8(bytes).map_err(|_| format!("{sums_url}: response is not valid UTF-8"))?;
+  remote::parse_sha256sums(&text, filename).map_err(|e| e.to_string())
+}
+
+/// Write the embedded ruleset as a release bundle for the distribution.
+fn run_bundle(args: &BundleArgs) -> ExitCode {
+  let bundle = match bundle::shipped_bundle() {
+    Ok(bundle) => bundle,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::InternalError;
+    }
+  };
+
+  let mut json = match serde_json::to_vec_pretty(&bundle) {
+    Ok(json) => json,
+    Err(e) => {
+      eprintln!("error: failed to serialize bundle: {e}");
+      return ExitCode::InternalError;
+    }
+  };
+  json.push(b'\n');
+
+  if let Err(e) = std::fs::write(&args.output, json) {
+    eprintln!("error: failed to write {}: {e}", args.output.display());
+    return ExitCode::InputError;
+  }
+
+  println!(
+    "✅ Wrote {} (ruleset {})",
+    args.output.display(),
+    bundle.ruleset_version
+  );
+  ExitCode::Installed
+}
+
+fn outcome_status(outcome: &Outcome) -> &'static str {
+  match outcome {
+    Outcome::Installed => "installed",
+    Outcome::Upgraded => "updated",
+    Outcome::Skipped => "up-to-date",
+    Outcome::Conflict { .. } => "conflict",
+    Outcome::DryRun { .. } => "dry-run",
+  }
+}
+
+/// Machine-readable `update-rules` report.
+#[derive(serde::Serialize)]
+struct UpdateReport<'a> {
+  from: &'a str,
+  to: &'a str,
+  templates: &'a [&'a str],
+  url: &'a str,
+  status: &'a str,
+  edited_rules: &'a [String],
+}
+
 /// Resolve the manifest `generated_at` timestamp: use `SOURCE_DATE_EPOCH`
 /// when the build system pins one (reproducible builds), otherwise the
 /// fixed default constant.
@@ -370,7 +641,7 @@ fn compose(
 
 /// Detect which shipped templates are present in an installed ruleset by
 /// looking for their namespaced rule ids (`WASM-1.1`, `TAURI-1.1`, …).
-fn detect_selection(installed: &agentforge_domain::RuleSet) -> Vec<(&'static str, &'static str)> {
+fn detect_template_names(installed: &agentforge_domain::RuleSet) -> Vec<&'static str> {
   agentforge_builder::TEMPLATES
     .iter()
     .filter(|t| {
@@ -380,7 +651,19 @@ fn detect_selection(installed: &agentforge_domain::RuleSet) -> Vec<(&'static str
         .iter()
         .any(|r| r.id.as_str().starts_with(&ns))
     })
-    .map(|t| (t.name, t.markdown))
+    .map(|t| t.name)
+    .collect()
+}
+
+fn detect_selection(installed: &agentforge_domain::RuleSet) -> Vec<(&'static str, &'static str)> {
+  detect_template_names(installed)
+    .into_iter()
+    .filter_map(|name| {
+      agentforge_builder::TEMPLATES
+        .iter()
+        .find(|t| t.name == name)
+        .map(|t| (t.name, t.markdown))
+    })
     .collect()
 }
 
@@ -672,5 +955,42 @@ mod tests {
   fn parses_no_arguments_as_default_init() {
     let cli = parse_cli(["cargo-agentforge"].map(std::ffi::OsString::from).to_vec());
     assert!(cli.command.is_none());
+  }
+
+  #[test]
+  fn parses_update_rules_flags() {
+    let cli = parse_cli(
+      [
+        "cargo-agentforge",
+        "agentforge",
+        "update-rules",
+        "--url",
+        "https://example.com/agentforge-rules-0.2.0.json",
+        "--yes",
+        "--dry-run",
+      ]
+      .map(std::ffi::OsString::from)
+      .to_vec(),
+    );
+    match cli.command {
+      Some(Command::UpdateRules(args)) => {
+        assert_eq!(args.url, "https://example.com/agentforge-rules-0.2.0.json");
+        assert!(args.yes);
+        assert!(args.dry_run);
+        assert!(!args.force);
+        assert!(args.sha256.is_none());
+      }
+      _ => panic!("expected update-rules"),
+    }
+  }
+
+  #[test]
+  fn update_rules_requires_a_url() {
+    let parsed = Cli::try_parse_from(
+      ["cargo-agentforge", "agentforge", "update-rules"]
+        .map(std::ffi::OsString::from)
+        .to_vec(),
+    );
+    assert!(parsed.is_err());
   }
 }
