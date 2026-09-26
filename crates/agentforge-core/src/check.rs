@@ -62,7 +62,7 @@ pub fn check_status<F: InstallTarget>(fs: &F, config: &Config) -> Result<CheckSt
 /// Compare two semver-ish version strings numerically, part by part
 /// (`"0.1.0" < "1.0.0"`, `"1.2" < "1.2.1"`). Non-numeric segments are
 /// ignored so partial versions compare predictably.
-fn compare_versions(a: &str, b: &str) -> Ordering {
+pub(crate) fn compare_versions(a: &str, b: &str) -> Ordering {
   let parts = |s: &str| -> Vec<u64> {
     s.split(|c: char| !c.is_ascii_digit())
       .filter(|p| !p.is_empty())

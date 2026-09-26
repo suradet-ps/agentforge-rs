@@ -55,6 +55,38 @@ pub enum CoreError {
 
   #[error("manifest version mismatch: installed={installed}, incoming={incoming}")]
   VersionMismatch { installed: String, incoming: String },
+
+  #[error("no ruleset installed at {path}; run `cargo agentforge init` first")]
+  NotInstalled { path: PathBuf },
+
+  #[error("failed to parse {path}: {source}")]
+  MarkdownParse {
+    path: PathBuf,
+    #[source]
+    source: agentforge_domain::error::DomainError,
+  },
+
+  #[error("failed to build a manifest from {path}: {source}")]
+  ManifestBuild {
+    path: PathBuf,
+    #[source]
+    source: agentforge_domain::error::DomainError,
+  },
+
+  #[error(
+    "refusing to downgrade the ruleset: installed={installed}, incoming={incoming} (pass --force to allow)"
+  )]
+  VersionDowngrade { installed: String, incoming: String },
+
+  #[error("malformed SHA-256 checksum: {value:?}")]
+  MalformedChecksum { value: String },
+
+  #[error("SHA-256 mismatch for {subject}: expected {expected}, got {actual}")]
+  ChecksumMismatch {
+    subject: String,
+    expected: String,
+    actual: String,
+  },
 }
 
 pub fn install<F: InstallTarget>(fs: &F, config: &Config) -> Result<Outcome, CoreError> {
@@ -67,7 +99,7 @@ pub fn install<F: InstallTarget>(fs: &F, config: &Config) -> Result<Outcome, Cor
           would_install: true,
         });
       }
-      write_files(fs, config)?;
+      write_ruleset(fs, config)?;
       Ok(Outcome::Installed)
     }
     Some(json) => {
@@ -97,7 +129,7 @@ pub fn install<F: InstallTarget>(fs: &F, config: &Config) -> Result<Outcome, Cor
         });
       }
 
-      write_files(fs, config)?;
+      write_ruleset(fs, config)?;
       Ok(Outcome::Upgraded)
     }
   }
@@ -117,7 +149,18 @@ fn find_edited_rules(existing: &RuleManifest, incoming: &RuleManifest) -> Vec<St
   edited
 }
 
-fn write_files<F: InstallTarget>(fs: &F, config: &Config) -> Result<(), CoreError> {
+/// Persist the ruleset: `AGENTS-RUST.md` first, then its manifest.
+///
+/// Writing the markdown first means an interrupted write can only leave a
+/// stale manifest next to newer rules (recoverable by re-running the tool),
+/// never a manifest that claims rules the markdown does not contain.
+pub(crate) fn write_ruleset<F: InstallTarget>(fs: &F, config: &Config) -> Result<(), CoreError> {
+  fs.write_file(&config.agents_md_path, &config.agents_md)
+    .map_err(|reason| CoreError::WriteFailed {
+      path: config.agents_md_path.clone(),
+      reason,
+    })?;
+
   let manifest_json =
     serde_json::to_string_pretty(&config.manifest).map_err(|e| CoreError::WriteFailed {
       path: config.manifest_path.clone(),
@@ -127,12 +170,6 @@ fn write_files<F: InstallTarget>(fs: &F, config: &Config) -> Result<(), CoreErro
   fs.write_file(&config.manifest_path, &manifest_json)
     .map_err(|reason| CoreError::WriteFailed {
       path: config.manifest_path.clone(),
-      reason,
-    })?;
-
-  fs.write_file(&config.agents_md_path, &config.agents_md)
-    .map_err(|reason| CoreError::WriteFailed {
-      path: config.agents_md_path.clone(),
       reason,
     })?;
 
