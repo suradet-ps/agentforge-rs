@@ -9,11 +9,18 @@ use std::time::Duration;
 use agentforge_core::{Checksum, Fetcher};
 use ureq::Agent;
 
+/// GitHub Releases location of this project's ruleset bundles.
+pub const RULESET_RELEASES_BASE: &str =
+  "https://github.com/suradet-ps/agentforge-rs/releases/download";
+
 /// Errors from fetching over the network or locating checksums.
 #[derive(Debug, thiserror::Error)]
 pub enum RemoteError {
   #[error("invalid ruleset URL: {0}")]
   InvalidUrl(String),
+
+  #[error("invalid ruleset version `{0}`: expected a semver-like value such as 0.2.0")]
+  InvalidRulesetVersion(String),
 
   #[error("checksum entry for {0} is missing from SHA256SUMS.txt")]
   MissingChecksumEntry(String),
@@ -62,6 +69,27 @@ impl Fetcher for UreqFetcher {
       .read_to_vec()
       .map_err(|e| format!("GET {url}: {e}"))
   }
+}
+
+/// Pinned URL of the ruleset bundle published for `version`.
+///
+/// # Errors
+///
+/// Returns [`RemoteError::InvalidRulesetVersion`] when the version is empty
+/// or contains characters that could escape the release path.
+pub fn pinned_ruleset_url(version: &str) -> Result<String, RemoteError> {
+  let valid = !version.is_empty()
+    && !version.contains("..")
+    && version
+      .bytes()
+      .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-');
+  if !valid {
+    return Err(RemoteError::InvalidRulesetVersion(version.to_string()));
+  }
+
+  Ok(format!(
+    "{RULESET_RELEASES_BASE}/rules-v{version}/agentforge-rules-{version}.json"
+  ))
 }
 
 /// File name of a release asset URL (query and fragment stripped).
@@ -218,5 +246,36 @@ mod tests {
   fn fetcher_rejects_non_http_urls_without_network() {
     let err = UreqFetcher::new().fetch("ftp://example.com/x").unwrap_err();
     assert!(err.contains("http(s)"), "{err}");
+  }
+
+  #[test]
+  fn pinned_url_targets_the_release_bundle() {
+    assert_eq!(
+      pinned_ruleset_url("0.2.0").unwrap(),
+      "https://github.com/suradet-ps/agentforge-rs/releases/download/rules-v0.2.0/agentforge-rules-0.2.0.json"
+    );
+  }
+
+  #[test]
+  fn pinned_url_rejects_path_escapes() {
+    for bad in ["", "..", "0.2.0/../../evil", "0.2.0 evil", "0.2.0?x=y"] {
+      assert!(
+        matches!(
+          pinned_ruleset_url(bad),
+          Err(RemoteError::InvalidRulesetVersion(_))
+        ),
+        "{bad:?} should be rejected"
+      );
+    }
+  }
+
+  #[test]
+  #[ignore = "live network: requires the published rules-v0.1.0 ruleset release"]
+  fn live_fetch_of_the_published_bundle() {
+    let url = pinned_ruleset_url("0.1.0").unwrap();
+    let bytes = UreqFetcher::new().fetch(&url).unwrap();
+    let bundle = crate::bundle::decode_bundle(&bytes).unwrap();
+    crate::bundle::verify_bundle(&bundle).unwrap();
+    assert_eq!(bundle.ruleset_version, "0.1.0");
   }
 }

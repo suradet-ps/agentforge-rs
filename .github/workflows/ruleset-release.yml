@@ -1,0 +1,75 @@
+name: Ruleset release
+
+on:
+  push:
+    tags:
+      - "rules-v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ruleset:
+    name: Publish ruleset bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Resolve the ruleset version from the tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#rules-v}"
+          if [ -z "$version" ] || [ "$version" = "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag must look like rules-v<version> (got $GITHUB_REF_NAME)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the CLI
+        run: cargo build --release -p cargo-agentforge
+
+      - name: Validation pipeline (release gate)
+        run: target/release/cargo-agentforge verify --template wasm,tauri,bevy,embedded,axum,cli,library --json
+
+      - name: Write the bundle
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          target/release/cargo-agentforge bundle --output "dist/agentforge-rules-$VERSION.json"
+
+      - name: Check the bundle matches the tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          jq -e --arg v "$VERSION" \
+            '.bundle_version == 1 and .ruleset_version == $v and .manifest.ruleset_version == $v' \
+            "dist/agentforge-rules-$VERSION.json" > /dev/null
+          echo "bundle matches tag rules-v$VERSION"
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum agentforge-rules-*.json > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "Ruleset ${GITHUB_REF_NAME#rules-v}" \
+            --generate-notes \
+            dist/agentforge-rules-*.json \
+            dist/SHA256SUMS.txt
