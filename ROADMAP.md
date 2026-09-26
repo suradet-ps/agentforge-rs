@@ -84,19 +84,19 @@ equally. The constitution becomes a **core + pluggable domain layer**.
 - [x] Offline by default: all templates embedded at compile time (like today's single template), no network on the install path
 - [x] Unit tests: each promised domain template compiles, merges cleanly, round-trips through the manifest (`every_shipped_template_merges_cleanly`, `every_shipped_template_round_trips_through_manifest`)
 
-## Phase 5: Data / Rules Pipeline & Distribution (offline half done)
+## Phase 5: Data / Rules Pipeline & Distribution (done)
 
 The README's "update the rules" story today is `cargo install --force`. That
 pulls the whole CLI binary just to refresh a text file. We separate **rule
 distribution** from **CLI distribution**.
 
-- [ ] `cargo agentforge update-rules` fetches the latest ruleset manifest + markdown from a pinned, TLS-validated URL (GitHub Releases asset), never disabling cert validation
-- [ ] Ruleset published as a standalone release asset (`agentforge-rules-<version>.json`, a self-contained bundle of core, fragments, and manifest) separate from the binary, so updating rules does not require reinstalling the CLI
-- [ ] Reproducible build: same input manifest → byte-identical `AGENTS-RUST.md` output (deterministic section ordering, no timestamps in output unless `--emit-metadata`)
+- [x] `cargo agentforge update-rules` fetches the ruleset bundle (manifest + markdown) from a pinned, TLS-validated URL, never disabling cert validation (`--ruleset-version` resolves to the GitHub Releases asset, `--url` targets custom sources)
+- [x] Ruleset published as a standalone release asset (`agentforge-rules-<version>.json`, a self-contained bundle of core, fragments, and manifest) by the `Ruleset release` workflow on `rules-v*` tags, separate from the binary, so updating rules does not require reinstalling the CLI
+- [x] Reproducible build: same input results in a byte-identical bundle, `AGENTS-RUST.md`, and manifest (deterministic section ordering; outputs carry the fixed `generated_at` constant, never wall-clock timestamps)
 - [x] `SOURCE_DATE_EPOCH` support for reproducible builds (`generated_at_from_epoch` — hand-rolled civil-from-days, no `chrono` dep)
 - [x] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest (`validation_report` in `agentforge-builder`)
 - [x] `validation-report.json` output (`errors`, `warnings`, `rule_count`, `fragment_count`); warns when an override weakens a `Mandatory` rule; surfaced as `cargo agentforge verify [--template …] [--json]`
-- [ ] Unit + integration tests against a fixture ruleset; the live-network fetch is `#[ignore]`d like MenSung's real-API tests
+- [x] Unit + integration tests against a bundled fixture ruleset; the live-network fetch is `#[ignore]`d (`live_fetch_of_the_published_bundle` against the pinned release)
 
 ## Phase 6: CLI Surface (`cargo-agentforge`) (open)
 
@@ -104,7 +104,7 @@ Expand the single install command into a coherent, scriptable CLI.
 
 - [x] `cargo agentforge init [--force] [--dry-run]` — install/upgrade, wired to `agentforge-core` (default subcommand; `--template` lands with Phase 4)
 - [x] `cargo agentforge check` — report installed ruleset version vs bundled baseline, non-zero on stale (`ExitCode::Stale`/`NotInstalled`); "vs latest" (network) lands with Phase 5
-- [x] `cargo agentforge update-rules --url <bundle> [--sha256 <hex>] [--yes] [--force] [--dry-run] [--json]`, explicit and confirmed network fetch (prompt before the first request), never automatic; the default release URL lands with the Phase 5 publishing work
+- [x] `cargo agentforge update-rules (--url <bundle> | --ruleset-version <version>) [--sha256 <hex>] [--yes] [--force] [--dry-run] [--json]`, explicit and confirmed network fetch (prompt before the first request), never automatic; `--ruleset-version` resolves to the pinned GitHub release bundle
 - [x] `cargo agentforge diff` — rule-level diff between installed and target ruleset, honoring local edits (parses the actual `AGENTS-RUST.md`, detects the installed template selection, compares body checksums; `ExitCode::HasDiff` on any change)
 - [x] `cargo agentforge validate` — parses the project's `AGENTS-RUST.md` and reports **every** malformed override, orphan override, duplicate id, and malformed heading with line numbers (`validate_agents_md`; non-zero on issues)
 - [x] `cargo agentforge version` — prints CLI version, never touches network or filesystem

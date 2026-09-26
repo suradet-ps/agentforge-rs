@@ -17,7 +17,7 @@ use agentforge_core::{
 };
 use agentforge_domain::{RuleManifest, parse_agents_md, validate_agents_md};
 
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgGroup, Args, Parser, Subcommand};
 use remote::UreqFetcher;
 
 const AGENTS_FILE: &str = "AGENTS-RUST.md";
@@ -90,10 +90,14 @@ struct VerifyArgs {
 
 /// Flags for `update-rules`.
 #[derive(Args)]
+#[command(group(ArgGroup::new("source").required(true).args(["url", "ruleset_version"])))]
 struct UpdateRulesArgs {
   /// URL of the ruleset bundle to download.
-  #[arg(long, value_name = "URL")]
-  url: String,
+  #[arg(long, value_name = "URL", group = "source")]
+  url: Option<String>,
+  /// Ruleset version published in this project's GitHub releases.
+  #[arg(long, value_name = "VERSION", group = "source")]
+  ruleset_version: Option<String>,
   /// Expected SHA-256 of the bundle; defaults to SHA256SUMS.txt next to it.
   #[arg(long, value_name = "SHA256")]
   sha256: Option<String>,
@@ -396,19 +400,34 @@ fn run_update_rules(args: &UpdateRulesArgs) -> ExitCode {
   };
   let selection = detect_template_names(&installed_rs);
 
+  let url = match (&args.url, &args.ruleset_version) {
+    (Some(url), _) => url.clone(),
+    (None, Some(version)) => match remote::pinned_ruleset_url(version) {
+      Ok(url) => url,
+      Err(e) => {
+        eprintln!("✗ {e}");
+        return ExitCode::InputError;
+      }
+    },
+    (None, None) => {
+      eprintln!("✗ pass --url or --ruleset-version");
+      return ExitCode::InputError;
+    }
+  };
+
   if !args.yes && !args.dry_run {
     if !std::io::stdin().is_terminal() {
       eprintln!("✗ refusing to prompt in a non-interactive session; pass --yes");
       return ExitCode::InputError;
     }
-    if !prompt_update(&args.url, args.sha256.as_deref()) {
+    if !prompt_update(&url, args.sha256.as_deref()) {
       println!("aborted; nothing written.");
       return ExitCode::Skipped;
     }
   }
 
   let fetcher = UreqFetcher::new();
-  let filename = match remote::asset_filename(&args.url) {
+  let filename = match remote::asset_filename(&url) {
     Ok(name) => name,
     Err(e) => {
       eprintln!("✗ {e}");
@@ -416,7 +435,7 @@ fn run_update_rules(args: &UpdateRulesArgs) -> ExitCode {
     }
   };
 
-  let bundle_bytes = match fetcher.fetch(&args.url) {
+  let bundle_bytes = match fetcher.fetch(&url) {
     Ok(bytes) => bytes,
     Err(e) => {
       eprintln!("✗ {e}");
@@ -424,14 +443,14 @@ fn run_update_rules(args: &UpdateRulesArgs) -> ExitCode {
     }
   };
 
-  let expected =
-    match resolve_expected_checksum(&fetcher, args.sha256.as_deref(), &args.url, &filename) {
-      Ok(checksum) => checksum,
-      Err(e) => {
-        eprintln!("✗ {e}");
-        return ExitCode::InputError;
-      }
-    };
+  let expected = match resolve_expected_checksum(&fetcher, args.sha256.as_deref(), &url, &filename)
+  {
+    Ok(checksum) => checksum,
+    Err(e) => {
+      eprintln!("✗ {e}");
+      return ExitCode::InputError;
+    }
+  };
   if let Err(e) = expected.verify(&filename, &bundle_bytes) {
     eprintln!("✗ {e}");
     return ExitCode::InputError;
@@ -492,7 +511,7 @@ fn run_update_rules(args: &UpdateRulesArgs) -> ExitCode {
       from: &installed.ruleset_version,
       to: &config.manifest.ruleset_version,
       templates: &selection,
-      url: &args.url,
+      url: &url,
       status: outcome_status(&outcome),
       edited_rules: edited,
     });
@@ -974,7 +993,11 @@ mod tests {
     );
     match cli.command {
       Some(Command::UpdateRules(args)) => {
-        assert_eq!(args.url, "https://example.com/agentforge-rules-0.2.0.json");
+        assert_eq!(
+          args.url.as_deref(),
+          Some("https://example.com/agentforge-rules-0.2.0.json")
+        );
+        assert!(args.ruleset_version.is_none());
         assert!(args.yes);
         assert!(args.dry_run);
         assert!(!args.force);
@@ -985,7 +1008,48 @@ mod tests {
   }
 
   #[test]
-  fn update_rules_requires_a_url() {
+  fn parses_update_rules_with_a_pinned_version() {
+    let cli = parse_cli(
+      [
+        "cargo-agentforge",
+        "agentforge",
+        "update-rules",
+        "--ruleset-version",
+        "0.2.0",
+        "--yes",
+      ]
+      .map(std::ffi::OsString::from)
+      .to_vec(),
+    );
+    match cli.command {
+      Some(Command::UpdateRules(args)) => {
+        assert_eq!(args.ruleset_version.as_deref(), Some("0.2.0"));
+        assert!(args.url.is_none());
+      }
+      _ => panic!("expected update-rules"),
+    }
+  }
+
+  #[test]
+  fn update_rules_rejects_two_sources() {
+    let parsed = Cli::try_parse_from(
+      [
+        "cargo-agentforge",
+        "agentforge",
+        "update-rules",
+        "--url",
+        "https://example.com/rules.json",
+        "--ruleset-version",
+        "0.2.0",
+      ]
+      .map(std::ffi::OsString::from)
+      .to_vec(),
+    );
+    assert!(parsed.is_err());
+  }
+
+  #[test]
+  fn update_rules_requires_a_source() {
     let parsed = Cli::try_parse_from(
       ["cargo-agentforge", "agentforge", "update-rules"]
         .map(std::ffi::OsString::from)

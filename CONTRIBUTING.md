@@ -30,6 +30,20 @@ PR guidelines
 - All CI checks (`cargo fmt`, `cargo clippy -D warnings`, `cargo test`,
   cross-platform build, `cargo audit`, `cargo deny`) must pass before merging.
 
+Ruleset releases
+
+Ruleset distribution is independent of the CLI version, so rules can be
+refreshed without reinstalling the binary.
+
+1. Bump `RULESET_VERSION` in `crates/agentforge-builder/src/templates.rs` and
+   merge the bump to `main` once CI is green.
+2. Tag that commit `rules-v<version>` (matching `RULESET_VERSION`) and push
+   the tag. The `Ruleset release` workflow re-runs the validation pipeline,
+   writes `agentforge-rules-<version>.json` with `cargo agentforge bundle`,
+   and publishes it with `SHA256SUMS.txt` on GitHub Releases.
+3. Users update with
+   `cargo agentforge update-rules --ruleset-version <version>`.
+
 License
 
 By contributing you agree that your contributions will be licensed under the project's MIT License.
