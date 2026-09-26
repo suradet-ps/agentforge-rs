@@ -91,7 +91,7 @@ pulls the whole CLI binary just to refresh a text file. We separate **rule
 distribution** from **CLI distribution**.
 
 - [ ] `cargo agentforge update-rules` fetches the latest ruleset manifest + markdown from a pinned, TLS-validated URL (GitHub Releases asset), never disabling cert validation
-- [ ] Ruleset published as a standalone release asset (`agentforge-rules-<version>.tar.zst`) separate from the binary, so updating rules does not require reinstalling the CLI
+- [ ] Ruleset published as a standalone release asset (`agentforge-rules-<version>.json`, a self-contained bundle of core, fragments, and manifest) separate from the binary, so updating rules does not require reinstalling the CLI
 - [ ] Reproducible build: same input manifest → byte-identical `AGENTS-RUST.md` output (deterministic section ordering, no timestamps in output unless `--emit-metadata`)
 - [x] `SOURCE_DATE_EPOCH` support for reproducible builds (`generated_at_from_epoch` — hand-rolled civil-from-days, no `chrono` dep)
 - [x] Validation pipeline: a ruleset build with override-target errors or rule-id collisions must not produce a shippable manifest (`validation_report` in `agentforge-builder`)
@@ -104,13 +104,13 @@ Expand the single install command into a coherent, scriptable CLI.
 
 - [x] `cargo agentforge init [--force] [--dry-run]` — install/upgrade, wired to `agentforge-core` (default subcommand; `--template` lands with Phase 4)
 - [x] `cargo agentforge check` — report installed ruleset version vs bundled baseline, non-zero on stale (`ExitCode::Stale`/`NotInstalled`); "vs latest" (network) lands with Phase 5
-- [ ] `cargo agentforge update-rules [--yes]` — explicit, confirmed network fetch; never automatic (Phase 5)
+- [x] `cargo agentforge update-rules --url <bundle> [--sha256 <hex>] [--yes] [--force] [--dry-run] [--json]`, explicit and confirmed network fetch (prompt before the first request), never automatic; the default release URL lands with the Phase 5 publishing work
 - [x] `cargo agentforge diff` — rule-level diff between installed and target ruleset, honoring local edits (parses the actual `AGENTS-RUST.md`, detects the installed template selection, compares body checksums; `ExitCode::HasDiff` on any change)
 - [x] `cargo agentforge validate` — parses the project's `AGENTS-RUST.md` and reports **every** malformed override, orphan override, duplicate id, and malformed heading with line numbers (`validate_agents_md`; non-zero on issues)
 - [x] `cargo agentforge version` — prints CLI version, never touches network or filesystem
 - [x] `cargo agentforge templates` — lists available domain templates and their descriptions
 - [x] Plain-text and `--json` output for `check`/`validate`/`diff` so CI can consume them
-- [ ] All network-touching commands gated on explicit user confirmation; no silent phone-home
+- [x] All network-touching commands gated on explicit user confirmation; no silent phone-home (interactive prompt before the first request; non-interactive runs must pass `--yes`)
 
 ## Phase 7: TUI / Interactive Installer (open, stretch)
 

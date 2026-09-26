@@ -29,9 +29,11 @@ you. We will credit reporters who wish to be named.
   `[lints] workspace = true`, and the `unsafe-audit` CI job verifies the
   policy stays in place. There is no way for a single crate to opt out.
 - The CLI installs a local `AGENTS-RUST.md` file into the user's project.
-  It performs no network access on the install path today (templates are
-  embedded). Network access, if added later for ruleset updates, will
-  always require explicit user confirmation and TLS validation that is
-  never disabled.
-- Supply-chain integrity for any future ruleset updates will be enforced
-  via checksum/signature verification before applying.
+  The install path performs no network access (templates are embedded).
+- `cargo agentforge update-rules` is the only network command. It asks for
+  explicit confirmation before the first request (non-interactive runs must
+  pass `--yes`), uses rustls with Mozilla's roots and never disables TLS
+  validation, verifies the SHA-256 of the downloaded bundle, and refuses to
+  overwrite locally-edited rules without `--force`.
+- Supply-chain integrity for ruleset updates is enforced via SHA-256
+  verification before applying; signatures are planned (Phase 10).

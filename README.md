@@ -51,6 +51,8 @@ Install once, forge everywhere.
 ⟫ cargo agentforge validate                  # every issue in the installed file, with line numbers
 ⟫ cargo agentforge diff                      # rule-level diff vs the target (honors local edits)
 ⟫ cargo agentforge verify [--template …]     # validation pipeline: is this ruleset shippable?
+⟫ cargo agentforge update-rules --url <bundle>  # fetch, verify SHA-256, and apply a newer ruleset
+⟫ cargo agentforge bundle --output <path>    # write the embedded ruleset as a release bundle
 ⟫ cargo agentforge version
 ```
 
@@ -69,10 +71,12 @@ code when something needs attention (conflict `3`, stale `4`, not-installed
 `5`, diff `6`, input error `2`). Reproducible builds are pinned via
 `SOURCE_DATE_EPOCH`, which fixes the manifest timestamp.
 
-Update the rules: `⟫ cargo install --git ... --force` to pull the latest
-baseline; `⟫ cargo agentforge init --force` to overwrite a locally edited
-constitution; `⟫ cargo agentforge init --dry-run` to preview before
-writing.
+Update the rules: `⟫ cargo agentforge update-rules --url <bundle>` downloads a
+published ruleset bundle, verifies its SHA-256 before applying it, and asks
+for confirmation before the first network request (`--yes` in CI,
+`--dry-run` to check without writing). `⟫ cargo install --git ... --force`
+refreshes the bundled baseline; `⟫ cargo agentforge init --force` overwrites
+a locally edited constitution.
 
 <details>
 <summary>What the CLI does</summary>
