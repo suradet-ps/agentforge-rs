@@ -9,6 +9,9 @@ use std::time::Duration;
 use agentforge_core::{Checksum, Fetcher};
 use ureq::Agent;
 
+const FETCH_ATTEMPTS: u32 = 3;
+const RETRY_DELAY_STEP: Duration = Duration::from_millis(250);
+
 /// GitHub Releases location of this project's ruleset bundles.
 pub const RULESET_RELEASES_BASE: &str =
   "https://github.com/suradet-ps/agentforge-rs/releases/download";
@@ -58,17 +61,77 @@ impl Fetcher for UreqFetcher {
       return Err(format!("invalid URL `{url}`: only http(s) is supported"));
     }
 
-    let mut response = self
-      .agent
-      .get(url)
-      .call()
-      .map_err(|e| format!("GET {url}: {e}"))?;
-
-    response
-      .body_mut()
-      .read_to_vec()
-      .map_err(|e| format!("GET {url}: {e}"))
+    fetch_with_retries(
+      url,
+      FETCH_ATTEMPTS,
+      |target| get_once(&self.agent, target),
+      |attempt, error| {
+        eprintln!("  fetch failed ({error}); retrying ({attempt}/{FETCH_ATTEMPTS})");
+        std::thread::sleep(RETRY_DELAY_STEP * attempt);
+      },
+    )
   }
+}
+
+/// One HTTP GET. Returns the body bytes or a human-readable transport error.
+fn get_once(agent: &Agent, url: &str) -> Result<Vec<u8>, String> {
+  let mut response = agent
+    .get(url)
+    .call()
+    .map_err(|e| format!("GET {url}: {e}"))?;
+  response
+    .body_mut()
+    .read_to_vec()
+    .map_err(|e| format!("GET {url}: {e}"))
+}
+
+/// Fetch with bounded retries.
+///
+/// The first attempt uses the canonical URL; retries append a marker so a
+/// transient failure that an intermediate cache has pinned to the exact URL
+/// (observed with GitHub's release download edge) cannot make the fetch fail
+/// permanently. Release assets are immutable, so the marker changes nothing
+/// about the content.
+///
+/// `on_retry` receives the failed attempt number and the error, and is
+/// expected to log and/or wait before the next attempt.
+fn fetch_with_retries(
+  url: &str,
+  attempts: u32,
+  mut get: impl FnMut(&str) -> Result<Vec<u8>, String>,
+  mut on_retry: impl FnMut(u32, &str),
+) -> Result<Vec<u8>, String> {
+  let mut last_error = String::new();
+
+  for attempt in 0..attempts.max(1) {
+    let target = if attempt == 0 {
+      url.to_string()
+    } else {
+      retry_url(url, attempt)
+    };
+
+    match get(&target) {
+      Ok(bytes) => return Ok(bytes),
+      Err(error) => {
+        last_error = error;
+        if attempt + 1 < attempts.max(1) {
+          on_retry(attempt + 1, &last_error);
+        }
+      }
+    }
+  }
+
+  if attempts > 1 {
+    Err(format!("{last_error} (after {attempts} attempts)"))
+  } else {
+    Err(last_error)
+  }
+}
+
+/// The canonical URL for a retry: the same target plus a `url_retry` marker.
+fn retry_url(url: &str, attempt: u32) -> String {
+  let separator = if url.contains('?') { '&' } else { '?' };
+  format!("{url}{separator}url_retry={attempt}")
 }
 
 /// Pinned URL of the ruleset bundle published for `version`.
@@ -267,6 +330,66 @@ mod tests {
         "{bad:?} should be rejected"
       );
     }
+  }
+
+  #[test]
+  fn retry_url_appends_with_question_or_ampersand() {
+    assert_eq!(
+      retry_url("https://example.com/rules.json", 1),
+      "https://example.com/rules.json?url_retry=1"
+    );
+    assert_eq!(
+      retry_url("https://example.com/rules.json?x=1", 2),
+      "https://example.com/rules.json?x=1&url_retry=2"
+    );
+  }
+
+  #[test]
+  fn retries_transient_failures_with_a_cache_buster() {
+    let mut urls: Vec<String> = Vec::new();
+    let mut retries: Vec<(u32, String)> = Vec::new();
+
+    let result = fetch_with_retries(
+      "https://example.com/rules.json",
+      3,
+      |target| {
+        urls.push(target.to_string());
+        if urls.len() == 1 {
+          Err("http status: 500".into())
+        } else {
+          Ok(b"bundle".to_vec())
+        }
+      },
+      |attempt, error| retries.push((attempt, error.to_string())),
+    );
+
+    assert_eq!(result.unwrap(), b"bundle");
+    assert_eq!(
+      urls,
+      vec![
+        "https://example.com/rules.json",
+        "https://example.com/rules.json?url_retry=1"
+      ]
+    );
+    assert_eq!(retries, vec![(1, "http status: 500".to_string())]);
+  }
+
+  #[test]
+  fn gives_up_after_the_last_attempt() {
+    let mut calls = 0;
+    let result = fetch_with_retries(
+      "https://example.com/rules.json",
+      3,
+      |_| {
+        calls += 1;
+        Err("http status: 500".into())
+      },
+      |_, _| {},
+    );
+
+    let error = result.unwrap_err();
+    assert!(error.contains("after 3 attempts"), "{error}");
+    assert_eq!(calls, 3);
   }
 
   #[test]
