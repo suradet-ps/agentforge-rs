@@ -143,7 +143,7 @@ mandatory rule.
 
 ## Phase 10: Security Hardening (open)
 
-- [ ] Full `unsafe` audit: currently zero `unsafe`; keep it that way and document the invariant in CI
+- [x] Full `unsafe` audit: currently zero `unsafe`; kept that way by `[workspace.lints.rust] unsafe_code = "forbid"` (every crate opts in) and the `unsafe-audit` CI job, documented in `SECURITY.md`
 - [ ] cargo-audit + cargo-deny stay green as dependencies (serde, ratatui, …) are added
 - [ ] Reproducible build verification: same input → byte-identical `AGENTS-RUST.md` and manifest
 - [ ] Supply-chain: pin and checksum the ruleset release asset; verify signature/SHA256 before applying an update

@@ -24,6 +24,10 @@ you. We will credit reporters who wish to be named.
 
 ## Scope Notes
 
+- The workspace forbids `unsafe` code at the lint level
+  (`[workspace.lints.rust] unsafe_code = "forbid"`). Every crate opts in via
+  `[lints] workspace = true`, and the `unsafe-audit` CI job verifies the
+  policy stays in place. There is no way for a single crate to opt out.
 - The CLI installs a local `AGENTS-RUST.md` file into the user's project.
   It performs no network access on the install path today (templates are
   embedded). Network access, if added later for ruleset updates, will
