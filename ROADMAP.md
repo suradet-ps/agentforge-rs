@@ -25,7 +25,7 @@ machine-readable rules manifest, and a reproducible offline-install story.
 - [x] cargo-audit + cargo-deny policy set (`deny.toml`), enforced in CI; currently zero deps, the gate stays as the tree grows
 - [x] Release workflow: tag-triggered, checksums (`SHA256SUMS.txt`), GitHub release via `gh` CLI
 - [x] SECURITY.md (private reporting, no-network install-path guarantee) and CODE_OF_CONDUCT.md (Contributor Covenant 2.1)
-- [ ] Branch protection on `main`: required status checks (strict), no force-push, no deletion — **must be enabled in the GitHub repository settings** (not settable from a file). Suggested command captured in the Phase 0 PR body. CI already enforces the same checks on every PR.
+- [x] Branch protection on `main`: required status checks (strict, all 10 CI checks), no force-push, no deletion, admins enforced (enabled in the GitHub repository settings via `gh api`, not settable from a file). CI enforces the same checks on every PR.
 
 ## Phase 1: Domain / Rule Model (`agentforge-domain`) (done)
 
