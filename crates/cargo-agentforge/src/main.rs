@@ -490,10 +490,15 @@ fn print_error_and_exit(e: CoreError) -> ExitCode {
   use agentforge_core::CoreError as E;
   eprintln!("error: {e}");
   match e {
-    E::VersionMismatch { .. } => ExitCode::Conflict,
-    E::ManifestRead { .. } | E::ManifestDeserialize(_) | E::WriteFailed { .. } => {
-      ExitCode::InputError
-    }
+    E::VersionMismatch { .. } | E::VersionDowngrade { .. } => ExitCode::Conflict,
+    E::NotInstalled { .. } => ExitCode::NotInstalled,
+    E::ManifestRead { .. }
+    | E::ManifestDeserialize(_)
+    | E::WriteFailed { .. }
+    | E::MarkdownParse { .. }
+    | E::ManifestBuild { .. }
+    | E::MalformedChecksum { .. }
+    | E::ChecksumMismatch { .. } => ExitCode::InputError,
   }
 }
 

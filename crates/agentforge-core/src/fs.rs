@@ -38,7 +38,25 @@ impl InstallTarget for RealFs {
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent).map_err(|e| format!("{e}"))?;
     }
-    std::fs::write(path, contents).map_err(|e| format!("{e}"))
+
+    // Atomic replace: write a sibling temp file, then rename it over the
+    // target. Readers see either the old file or the new one, never a
+    // half-written mix, and a failed write leaves the target untouched.
+    let file_name = path
+      .file_name()
+      .ok_or_else(|| format!("invalid path: {}", path.display()))?
+      .to_string_lossy();
+    let temp = path.with_file_name(format!(".{file_name}.{}.tmp", std::process::id()));
+
+    std::fs::write(&temp, contents).map_err(|e| {
+      let _ = std::fs::remove_file(&temp);
+      e.to_string()
+    })?;
+
+    std::fs::rename(&temp, path).map_err(|e| {
+      let _ = std::fs::remove_file(&temp);
+      e.to_string()
+    })
   }
 
   fn file_exists(&self, path: &Path) -> bool {
@@ -102,5 +120,38 @@ impl InstallTarget for MockFs {
 
   fn label(&self) -> &str {
     &self.label
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn real_fs_write_replaces_atomically() {
+    let nanos = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let dir = std::env::temp_dir().join(format!("agentforge-fs-{}-{nanos}", std::process::id()));
+    let path = dir.join("AGENTS-RUST.md");
+    let fs = RealFs;
+
+    fs.write_file(&path, "one").unwrap();
+    fs.write_file(&path, "two").unwrap();
+    assert_eq!(fs.read_file(&path).as_deref(), Some("two"));
+
+    let leftovers: Vec<String> = std::fs::read_dir(&dir)
+      .unwrap()
+      .filter_map(|entry| entry.ok())
+      .map(|entry| entry.file_name().to_string_lossy().into_owned())
+      .filter(|name| name.ends_with(".tmp"))
+      .collect();
+    assert!(
+      leftovers.is_empty(),
+      "temp files left behind: {leftovers:?}"
+    );
+
+    std::fs::remove_dir_all(&dir).ok();
   }
 }

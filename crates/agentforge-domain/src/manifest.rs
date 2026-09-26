@@ -70,7 +70,7 @@ impl RuleManifest {
         title: r.title.clone(),
         severity: r.severity.label().to_string(),
         tags: r.tags.clone(),
-        body_checksum: sha256_hex(&r.body),
+        body_checksum: sha256_hex(r.body.as_bytes()),
       })
       .collect();
 
@@ -107,10 +107,13 @@ impl RuleManifest {
   }
 }
 
-/// SHA-256 hex digest of `input` (lowercase, 64 characters).
-fn sha256_hex(input: &str) -> String {
+/// SHA-256 hex digest of `bytes` (lowercase, 64 characters).
+///
+/// Public so tooling that verifies downloaded artifacts (the updater) uses
+/// the exact same digest implementation as the manifest.
+pub fn sha256_hex(bytes: &[u8]) -> String {
   const HEX: &[u8; 16] = b"0123456789abcdef";
-  let digest = sha2::Sha256::digest(input.as_bytes());
+  let digest = sha2::Sha256::digest(bytes);
   let mut hex = String::with_capacity(digest.len() * 2);
   for byte in digest {
     hex.push(HEX[(byte >> 4) as usize] as char);
@@ -186,21 +189,21 @@ mod tests {
 
   #[test]
   fn sha256_hex_is_deterministic() {
-    let a = sha256_hex("hello");
-    let b = sha256_hex("hello");
+    let a = sha256_hex(b"hello");
+    let b = sha256_hex(b"hello");
     assert_eq!(a, b);
-    let c = sha256_hex("world");
+    let c = sha256_hex(b"world");
     assert_ne!(a, c);
   }
 
   #[test]
   fn sha256_hex_known_vectors() {
     assert_eq!(
-      sha256_hex(""),
+      sha256_hex(b""),
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     );
     assert_eq!(
-      sha256_hex("abc"),
+      sha256_hex(b"abc"),
       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
   }
