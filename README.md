@@ -1,13 +1,10 @@
 # AgentForge-RS
 
-```
- █████╗  ██████╗███████╗███╗   ██╗████████╗███████╗ ██████╗ ██████╗  ██████╗███████╗
-██╔══██╗██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔════╝
-███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   █████╗  ██║   ██║██████╔╝██║  ███╗█████╗
-██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝
-██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
-╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚══════╝
-```
+[![CI](https://github.com/suradet-ps/agentforge-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/suradet-ps/agentforge-rs/actions/workflows/ci.yml)
+[![Perf budgets](https://github.com/suradet-ps/agentforge-rs/actions/workflows/perf.yml/badge.svg?branch=main)](https://github.com/suradet-ps/agentforge-rs/actions/workflows/perf.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![MSRV: 1.95.0](https://img.shields.io/badge/MSRV-1.95.0-orange.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 ---
 
