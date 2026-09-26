@@ -103,6 +103,18 @@ jobs:
       - name: Run audit
         run: cargo audit
 
+  unsafe-audit:
+    name: Unsafe audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Enforce the unsafe_code = "forbid" policy
+        run: bash scripts/unsafe-audit.sh
+
   deny:
     name: Dependency policy
     runs-on: ubuntu-latest
