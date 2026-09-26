@@ -29,7 +29,7 @@ produces byte-identical JSON output.
       "title": "Rust Idioms",
       "severity": "mandatory",
       "tags": ["tokio", "unsafe"],
-      "body_checksum": "a1b2c3d4e5f6a1b2"
+      "body_checksum": "b4e035751b5a749f4a70c0430b483032b94f83427aa439045c69a7ad6784906c"
     }
   ],
   "overrides": [
@@ -63,7 +63,7 @@ produces byte-identical JSON output.
 | `title` | string | yes | Short title of the rule. |
 | `severity` | string | yes | One of `"mandatory"`, `"recommended"`, `"advisory"`. |
 | `tags` | array[string] | yes | Machine-readable tags. May be empty. |
-| `body_checksum` | string | yes | Hex-encoded hash of the rule body text. Used to detect local edits. Algorithm is implementation-defined but must be deterministic. |
+| `body_checksum` | string | yes | SHA-256 hex digest of the rule body text (64 lowercase hex characters). Used to detect local edits. |
 
 ### `ManifestOverride`
 
@@ -89,8 +89,8 @@ The same `RuleSet` input must always produce the same JSON output:
 
 - `rules` are emitted in insertion order (the order they appear in the
   `RuleSet`).
-- `body_checksum` is computed from the rule body text using a deterministic
-  hash function.
+- `body_checksum` is the SHA-256 digest of the rule body text, lowercase hex
+  encoded.
 - `generated_at` is provided by the caller, not read from the system clock.
 - JSON serialization uses `serde_json::to_string_pretty` with default
   settings (2-space indent).
@@ -137,7 +137,7 @@ would be:
       "title": "Rust Idioms",
       "severity": "mandatory",
       "tags": [],
-      "body_checksum": "<hash of 'Follow idiomatic Rust patterns.'>"
+      "body_checksum": "b4e035751b5a749f4a70c0430b483032b94f83427aa439045c69a7ad6784906c"
     },
     {
       "id": "5.2",
@@ -145,7 +145,7 @@ would be:
       "title": "Error Handling",
       "severity": "recommended",
       "tags": [],
-      "body_checksum": "<hash of 'Use thiserror for library crates.'>"
+      "body_checksum": "9723fc9b4328ff034b6228d3306fa4cfa878a86175dce1a2f0d6f6988deb76d5"
     }
   ],
   "overrides": [
