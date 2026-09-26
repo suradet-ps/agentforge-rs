@@ -145,7 +145,7 @@ mandatory rule.
 
 - [x] Full `unsafe` audit: currently zero `unsafe`; kept that way by `[workspace.lints.rust] unsafe_code = "forbid"` (every crate opts in) and the `unsafe-audit` CI job, documented in `SECURITY.md`
 - [ ] cargo-audit + cargo-deny stay green as dependencies (serde, ratatui, …) are added
-- [ ] Reproducible build verification: same input → byte-identical `AGENTS-RUST.md` and manifest
+- [x] Reproducible build verification: same input results in byte-identical `AGENTS-RUST.md` and manifest (test `reproducible_build.rs` plus `scripts/repro-check.sh` in the `Reproducible build` CI job)
 - [ ] Supply-chain: pin and checksum the ruleset release asset; verify signature/SHA256 before applying an update
 - [ ] Never disable TLS validation on the update path; reject self-signed/mismatched certs with a typed error
 
