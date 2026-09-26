@@ -40,7 +40,7 @@ This is the phase that makes everything downstream possible.
 - [x] `RuleSet` (the parsed `AGENTS-RUST.md`): ordered rules + overrides + recorded section headings (`Section { id, title }`), with `add_rule()` / `add_override()` / `add_section()` validation (duplicate IDs rejected, override targets must exist), lookup by ID
 - [x] Markdown → `RuleSet` parser (`parse_agents_md`): code-fence-aware extraction of sections (`## N` or `## WASM-1`), sub-rules (`### N.N`), and `[OVERRIDE §X]` directives; sections without sub-rules become single rules; typed errors, never panics; the bundled 14-section template parses into 27 rules
 - [x] Lenient validator (`validate_agents_md`): same scan reports **every** issue with line numbers (`MalformedHeading`, `DuplicateRuleId`, `DuplicateSection`, `DuplicateOverride`, `MalformedOverride`, `OrphanOverride`, `EmptyRuleSet`) instead of stopping at the first; JSON-serializable `ValidationReport`
-- [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule body checksums (FNV-1a placeholder for SHA-256), JSON serializable
+- [x] `RuleManifest` (new, see Phase 2): versioned, machine-readable companion to the markdown, so tooling never has to parse prose to know "what version of the rules is installed"; `from_rule_set()` with per-rule SHA-256 body checksums, JSON serializable
 - [x] Domain error types with `thiserror`; typed errors for `InvalidRuleId`, `DuplicateRuleId`, `OverrideTargetNotFound`, `DuplicateOverride`, `EmptyRuleSet`, `MissingField`, `ManifestVersionMismatch`
 - [x] Unit tests: 30 tests covering rule-id ordering, override-target validation, duplicate-rule rejection, severity ordering, override parsing (valid/invalid/edge cases), manifest generation, serialization round-trip
 - [x] Workspace restructured: root `Cargo.toml` now a workspace with `crates/cargo-agentforge` and `crates/agentforge-domain`
@@ -52,7 +52,7 @@ The markdown is for humans and agents. Tooling (CI, the CLI's own
 version-check, future IDE plugins) needs a stable, parseable artifact.
 
 - [x] Manifest fields: `manifest_version`, `ruleset_version`, `generated_at`, `rule_count`, `rules[]` (id, section, severity, tags, checksum of body), `overrides[]` — defined as `RuleManifest` / `ManifestRule` / `ManifestOverride` in `agentforge-domain`
-- [x] Per-rule body checksum so the CLI can detect "the user edited this rule locally" vs "this is a pristine baseline rule" — the foundation of safe updates (Phase 6); currently FNV-1a, will swap for real SHA-256
+- [x] Per-rule body checksum so the CLI can detect "the user edited this rule locally" vs "this is a pristine baseline rule" — the foundation of safe updates (Phase 6); body checksums are real SHA-256 (64 hex characters)
 - [x] Schema validation via `serde` deserialization; rejects malformed manifests with typed errors, never panics
 - [x] Format specification written down (`docs/RULE_MANIFEST.md`): schema, versioning strategy (semver of the rule set, independent of the CLI version), forward/backward compatibility rules
 - [x] Round-trip test: parse baseline → emit manifest → re-read manifest → identical effective rule set

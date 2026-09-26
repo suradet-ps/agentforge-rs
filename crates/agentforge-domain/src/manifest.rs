@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 
 /// A machine-readable, versioned companion to the `AGENTS-RUST.md` file.
 ///
@@ -106,22 +107,16 @@ impl RuleManifest {
   }
 }
 
-/// Minimal SHA-256 hex digest (no external crate dependency).
-///
-/// This is a placeholder that produces a deterministic hex string from the
-/// input. For production use, swap this with a real SHA-256 crate.
+/// SHA-256 hex digest of `input` (lowercase, 64 characters).
 fn sha256_hex(input: &str) -> String {
-  // Use a simple FNV-1a-like hash for now; will be replaced with real
-  // SHA-256 when we add the `sha2` crate dependency. For the domain
-  // model's purposes this is sufficient: it must be deterministic and
-  // change when the input changes.
-  let bytes = input.as_bytes();
-  let mut hash: u64 = 0xcbf29ce484222325; // FNV offset basis
-  for &b in bytes {
-    hash ^= b as u64;
-    hash = hash.wrapping_mul(0x100000001b3); // FNV prime
+  const HEX: &[u8; 16] = b"0123456789abcdef";
+  let digest = sha2::Sha256::digest(input.as_bytes());
+  let mut hex = String::with_capacity(digest.len() * 2);
+  for byte in digest {
+    hex.push(HEX[(byte >> 4) as usize] as char);
+    hex.push(HEX[(byte & 0x0f) as usize] as char);
   }
-  format!("{hash:016x}")
+  hex
 }
 
 #[cfg(test)]
@@ -196,6 +191,29 @@ mod tests {
     assert_eq!(a, b);
     let c = sha256_hex("world");
     assert_ne!(a, c);
+  }
+
+  #[test]
+  fn sha256_hex_known_vectors() {
+    assert_eq!(
+      sha256_hex(""),
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+    assert_eq!(
+      sha256_hex("abc"),
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+  }
+
+  #[test]
+  fn body_checksum_is_64_char_sha256() {
+    let rs = make_ruleset();
+    let m = RuleManifest::from_rule_set(&rs, "2026-01-01T00:00:00Z").unwrap();
+    assert_eq!(
+      m.rules[0].body_checksum,
+      "b4e035751b5a749f4a70c0430b483032b94f83427aa439045c69a7ad6784906c"
+    );
+    assert!(m.rules.iter().all(|r| r.body_checksum.len() == 64));
   }
 
   #[test]
